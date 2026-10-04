@@ -61,3 +61,31 @@ export interface SheetTabInfo {
   rowCount?: number;
   columnCount?: number;
 }
+
+export interface GoogleFormQuestion {
+  questionId: string;
+  title: string;
+  type: string;
+  required?: boolean;
+}
+
+export interface GoogleFormInfo {
+  formId: string;
+  title: string;
+  description?: string;
+  responderUri?: string;
+  linkedSheetId?: string;
+  questions: GoogleFormQuestion[];
+}
+
+export interface GoogleFormResponse {
+  responseId: string;
+  createTime: string;
+  lastSubmittedTime?: string;
+  answers: Record<string, string[]>;
+  extractedName?: string;
+  extractedPhone?: string;
+  extractedMinistry?: string;
+  extractedNotes?: string;
+}
+

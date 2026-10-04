@@ -16,7 +16,12 @@ export const auth = getAuth(app);
 // Provider with required Workspace scopes
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('https://www.googleapis.com/auth/spreadsheets');
+googleProvider.addScope('https://www.googleapis.com/auth/drive');
+googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
 googleProvider.addScope('https://www.googleapis.com/auth/drive.readonly');
+googleProvider.addScope('https://www.googleapis.com/auth/forms.body');
+googleProvider.addScope('https://www.googleapis.com/auth/forms.body.readonly');
+googleProvider.addScope('https://www.googleapis.com/auth/forms.responses.readonly');
 googleProvider.setCustomParameters({
   prompt: 'select_account',
 });

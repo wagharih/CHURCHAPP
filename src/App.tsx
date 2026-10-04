@@ -23,7 +23,8 @@ import {
   getOutreachLogs,
   clearOutreachLogs,
 } from './services/communications';
-import { MemberRecord, ChurchEvent, OutreachLog } from './types';
+import { getFormResponses, createMinistryGoogleForm } from './services/forms';
+import { MemberRecord, ChurchEvent, OutreachLog, GoogleFormInfo, GoogleFormResponse } from './types';
 import {
   DEFAULT_CHURCH_NAME,
   DEFAULT_WELCOME_TEMPLATE,
@@ -42,6 +43,8 @@ import { BatchBroadcastRunnerModal } from './components/BatchBroadcastRunnerModa
 import { AddEventModal } from './components/AddEventModal';
 import { OutreachLogsView } from './components/OutreachLogsView';
 import { ConfirmationModal } from './components/ConfirmationModal';
+import { FormsHub } from './components/FormsHub';
+import { FormSelectorModal } from './components/FormSelectorModal';
 
 export default function App() {
   // Auth state
@@ -50,7 +53,7 @@ export default function App() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // App Navigation
-  const [activeTab, setActiveTab] = useState<'members' | 'welcome' | 'broadcast' | 'logs' | 'sheet'>(
+  const [activeTab, setActiveTab] = useState<'members' | 'forms' | 'welcome' | 'broadcast' | 'logs' | 'sheet'>(
     'members'
   );
 
@@ -72,6 +75,19 @@ export default function App() {
   const [currentTabName, setCurrentTabName] = useState<string | null>(() => {
     return localStorage.getItem('mp_tab_name');
   });
+
+  // Google Form state
+  const [currentForm, setCurrentForm] = useState<GoogleFormInfo | null>(() => {
+    const saved = localStorage.getItem('mp_current_form');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [formResponses, setFormResponses] = useState<GoogleFormResponse[]>(() => {
+    const saved = localStorage.getItem('mp_form_responses');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [isFormSelectorOpen, setIsFormSelectorOpen] = useState(false);
+  const [isRefreshingForms, setIsRefreshingForms] = useState(false);
+  const [isCreatingForm, setIsCreatingForm] = useState(false);
 
   // Data
   const [members, setMembers] = useState<MemberRecord[]>(() => {
@@ -179,6 +195,108 @@ export default function App() {
       syncWithGoogleSheet();
     }
   }, [accessToken, currentSheetId, currentTabName, syncWithGoogleSheet]);
+
+  // Sync Form Responses from Google Forms
+  const syncFormResponses = useCallback(async () => {
+    const token = accessToken || getAccessToken();
+    if (!token || !currentForm) return;
+
+    setIsRefreshingForms(true);
+    try {
+      const responses = await getFormResponses(token, currentForm.formId, currentForm.questions);
+      setFormResponses(responses);
+      localStorage.setItem('mp_form_responses', JSON.stringify(responses));
+    } catch (err: any) {
+      console.error('Error fetching form responses:', err);
+    } finally {
+      setIsRefreshingForms(false);
+    }
+  }, [accessToken, currentForm]);
+
+  // Auto-sync forms when form or token becomes available
+  useEffect(() => {
+    if (accessToken && currentForm) {
+      syncFormResponses();
+    }
+  }, [accessToken, currentForm, syncFormResponses]);
+
+  const handleSelectForm = async (form: GoogleFormInfo) => {
+    setCurrentForm(form);
+    localStorage.setItem('mp_current_form', JSON.stringify(form));
+    const token = accessToken || getAccessToken();
+    if (token) {
+      setIsRefreshingForms(true);
+      try {
+        const responses = await getFormResponses(token, form.formId, form.questions);
+        setFormResponses(responses);
+        localStorage.setItem('mp_form_responses', JSON.stringify(responses));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsRefreshingForms(false);
+      }
+    }
+  };
+
+  const handleCreateNewForm = async () => {
+    const token = accessToken || getAccessToken();
+    if (!token) return;
+    setIsCreatingForm(true);
+    try {
+      const created = await createMinistryGoogleForm(
+        token,
+        `${churchName} - Ministry & Worship Registration`,
+        churchName
+      );
+      // Read details back
+      const { getFormDetails } = await import('./services/forms');
+      const formInfo = await getFormDetails(token, created.formId);
+      await handleSelectForm(formInfo);
+    } catch (err: any) {
+      console.error('Failed to create form in Drive:', err);
+      alert(err.message || 'Failed to create Google Form');
+    } finally {
+      setIsCreatingForm(false);
+    }
+  };
+
+  const handleImportResponseToMembers = async (
+    resp: GoogleFormResponse,
+    autoWelcome: boolean
+  ) => {
+    await handleSaveMember(
+      {
+        fullName: resp.extractedName || 'Form Respondent',
+        phoneNumber: resp.extractedPhone || '',
+        ministry: resp.extractedMinistry || 'General Ministry',
+        registeredAt: resp.createTime ? resp.createTime.split('T')[0] : new Date().toISOString().split('T')[0],
+        welcomeStatus: 'Pending',
+        notes: resp.extractedNotes ? `Form Submission | ${resp.extractedNotes}` : 'Imported from Google Forms',
+      },
+      { autoWelcome }
+    );
+  };
+
+  const handleOpenDispatcherForResponse = (resp: GoogleFormResponse) => {
+    const tempMember: MemberRecord = {
+      id: `temp-${resp.responseId}`,
+      rowNumber: 0,
+      fullName: resp.extractedName || 'Friend',
+      phoneNumber: resp.extractedPhone || '',
+      cleanPhone: (resp.extractedPhone || '').replace(/[^\d+]/g, ''),
+      ministry: resp.extractedMinistry || 'General Ministry',
+      registeredAt: resp.createTime ? resp.createTime.split('T')[0] : new Date().toISOString().split('T')[0],
+      welcomeStatus: 'Pending',
+      notes: resp.extractedNotes,
+    };
+
+    handleOpenDispatcher(tempMember, 'welcome');
+  };
+
+  // Sync both Google Sheet and Google Forms
+  const handleSyncAll = async () => {
+    await Promise.all([syncWithGoogleSheet(), syncFormResponses()]);
+  };
 
   // Sign In Handler
   const handleGoogleSignIn = async () => {
@@ -476,13 +594,16 @@ export default function App() {
         onLogout={handleLogout}
         currentSheetName={currentSheetTitle}
         currentTabName={currentTabName}
+        currentFormTitle={currentForm?.title || null}
         onOpenSheetSelector={() => setIsSheetModalOpen(true)}
-        onSync={syncWithGoogleSheet}
-        isSyncing={isSyncing}
+        onOpenFormSelector={() => setIsFormSelectorOpen(true)}
+        onSync={handleSyncAll}
+        isSyncing={isSyncing || isRefreshingForms}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         pendingWelcomesCount={pendingWelcomesCount}
         membersCount={members.length}
+        formResponsesCount={formResponses.length}
         churchName={churchName}
       />
 
@@ -528,6 +649,23 @@ export default function App() {
             isSyncing={isSyncing}
             hasGoogleSheet={!!currentSheetId && !!accessToken}
             currentSheetName={currentSheetTitle}
+          />
+        )}
+
+        {/* Tab: Google Forms Intake */}
+        {activeTab === 'forms' && (
+          <FormsHub
+            currentForm={currentForm}
+            formResponses={formResponses}
+            onOpenFormSelector={() => setIsFormSelectorOpen(true)}
+            onCreateNewForm={handleCreateNewForm}
+            onRefreshResponses={syncFormResponses}
+            isRefreshing={isRefreshingForms}
+            isCreating={isCreatingForm}
+            onImportResponseToMembers={handleImportResponseToMembers}
+            onOpenDispatcherForResponse={handleOpenDispatcherForResponse}
+            churchName={churchName}
+            hasGoogleAuth={!!accessToken}
           />
         )}
 
@@ -710,6 +848,15 @@ export default function App() {
         affectedCount={confirmationData.affectedCount}
         confirmLabel={confirmationData.confirmLabel}
         isDestructive={confirmationData.isDestructive}
+      />
+
+      {/* 7. Google Form Selector Modal */}
+      <FormSelectorModal
+        isOpen={isFormSelectorOpen}
+        onClose={() => setIsFormSelectorOpen(false)}
+        accessToken={accessToken}
+        onSelectForm={handleSelectForm}
+        churchName={churchName}
       />
     </div>
   );

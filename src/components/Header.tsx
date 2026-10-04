@@ -3,6 +3,7 @@ import { User } from 'firebase/auth';
 import {
   Church,
   FileSpreadsheet,
+  FileText,
   RefreshCw,
   LogOut,
   Sparkles,
@@ -23,13 +24,16 @@ interface HeaderProps {
   onLogout: () => void;
   currentSheetName: string | null;
   currentTabName: string | null;
+  currentFormTitle: string | null;
   onOpenSheetSelector: () => void;
+  onOpenFormSelector: () => void;
   onSync: () => void;
   isSyncing: boolean;
-  activeTab: 'members' | 'welcome' | 'broadcast' | 'logs' | 'sheet';
-  setActiveTab: (tab: 'members' | 'welcome' | 'broadcast' | 'logs' | 'sheet') => void;
+  activeTab: 'members' | 'forms' | 'welcome' | 'broadcast' | 'logs' | 'sheet';
+  setActiveTab: (tab: 'members' | 'forms' | 'welcome' | 'broadcast' | 'logs' | 'sheet') => void;
   pendingWelcomesCount: number;
   membersCount: number;
+  formResponsesCount: number;
   churchName: string;
 }
 
@@ -41,13 +45,16 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
   currentSheetName,
   currentTabName,
+  currentFormTitle,
   onOpenSheetSelector,
+  onOpenFormSelector,
   onSync,
   isSyncing,
   activeTab,
   setActiveTab,
   pendingWelcomesCount,
   membersCount,
+  formResponsesCount,
   churchName,
 }) => {
   return (
@@ -70,18 +77,37 @@ export const Header: React.FC<HeaderProps> = ({
                 </h1>
               </div>
               <p className="text-xs text-slate-400 truncate max-w-[200px] sm:max-w-none">
-                {churchName} • Registrations &amp; Broadcast Hub
+                {churchName} • Forms, Registrations &amp; Broadcast Hub
               </p>
             </div>
           </div>
 
-          {/* Right Side: Google Sheet Status & Google Sign In Button */}
-          <div className="flex items-center gap-3">
+          {/* Right Side: Google Form & Sheet Status & Google Sign In Button */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Form Connection Status Badge */}
+            {hasToken && (
+              <button
+                onClick={onOpenFormSelector}
+                className="flex items-center gap-2 text-xs py-1.5 px-2.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition group"
+                title="Manage connected Google Form"
+              >
+                <FileText className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+                <div className="text-left hidden xl:block">
+                  <div className="text-[10px] uppercase font-semibold text-slate-400 leading-none">
+                    Google Form
+                  </div>
+                  <div className="font-medium text-purple-300 truncate max-w-[120px]">
+                    {currentFormTitle || 'Connect Form'}
+                  </div>
+                </div>
+              </button>
+            )}
+
             {/* Sheet Connection Status Badge */}
             {hasToken ? (
               <button
                 onClick={onOpenSheetSelector}
-                className="flex items-center gap-2 text-xs py-1.5 px-3 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition group"
+                className="flex items-center gap-2 text-xs py-1.5 px-2.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition group"
                 title="Manage connected Google Sheet"
               >
                 <FileSpreadsheet className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
@@ -89,8 +115,8 @@ export const Header: React.FC<HeaderProps> = ({
                   <div className="text-[10px] uppercase font-semibold text-slate-400 leading-none">
                     Google Sheet
                   </div>
-                  <div className="font-medium text-emerald-300 truncate max-w-[140px]">
-                    {currentSheetName ? `${currentSheetName} (${currentTabName || 'Tab'})` : 'Select Sheet'}
+                  <div className="font-medium text-emerald-300 truncate max-w-[130px]">
+                    {currentSheetName ? `${currentSheetName}` : 'Select Sheet'}
                   </div>
                 </div>
                 <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-emerald-950 animate-pulse md:hidden" />
@@ -98,7 +124,7 @@ export const Header: React.FC<HeaderProps> = ({
             ) : (
               <div className="hidden sm:flex items-center gap-1.5 text-xs text-amber-300/90 bg-amber-950/40 border border-amber-800/60 px-2.5 py-1 rounded-lg">
                 <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
-                <span>Demo Mode (Google Sheet disconnected)</span>
+                <span>Demo Mode (Sign in to connect Google Forms &amp; Sheets)</span>
               </div>
             )}
 
@@ -108,10 +134,10 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={onSync}
                 disabled={isSyncing}
                 className="flex items-center gap-1.5 text-xs font-medium py-1.5 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition disabled:opacity-50"
-                title="Sync from Google Sheets"
+                title="Sync from Google Sheets & Forms"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync Sheet'}</span>
+                <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
               </button>
             )}
 
@@ -146,7 +172,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               </div>
             ) : (
-              /* Official Google Sign-in Styled Button compliant with workspace-integration guidelines */
+              /* Official Google Sign-in Styled Button */
               <button
                 onClick={onLogin}
                 disabled={isLoggingIn}
@@ -186,7 +212,8 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Main Navigation Tabs */}
       <div className="bg-slate-950/60 border-t border-slate-800/80 px-4 sm:px-6 lg:px-8">
-        <nav className="flex space-x-1 sm:space-x-4 overflow-x-auto py-2 scrollbar-none">
+        <nav className="flex space-x-1 sm:space-x-3 overflow-x-auto py-2 scrollbar-none">
+          {/* Contacts */}
           <button
             onClick={() => setActiveTab('members')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${
@@ -202,6 +229,25 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </button>
 
+          {/* Google Forms Hub */}
+          <button
+            onClick={() => setActiveTab('forms')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${
+              activeTab === 'forms'
+                ? 'bg-purple-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            <span>Google Forms Intake</span>
+            {formResponsesCount > 0 && (
+              <span className="ml-1 text-[11px] px-1.5 py-0.2 rounded-full bg-purple-400 text-slate-950 font-bold">
+                {formResponsesCount}
+              </span>
+            )}
+          </button>
+
+          {/* Automated Welcome */}
           <button
             onClick={() => setActiveTab('welcome')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${
@@ -223,6 +269,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </button>
 
+          {/* Worship Nights & Broadcasts */}
           <button
             onClick={() => setActiveTab('broadcast')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${
@@ -235,6 +282,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Worship Nights &amp; Broadcasts</span>
           </button>
 
+          {/* Outreach History */}
           <button
             onClick={() => setActiveTab('logs')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${
@@ -247,6 +295,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Outreach History</span>
           </button>
 
+          {/* Google Sheets Setup */}
           <button
             onClick={() => setActiveTab('sheet')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${
@@ -263,3 +312,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+
