@@ -1,0 +1,6 @@
+{
+  "name": "MinistryPulse - Church Outreach & Worship Broadcast Manager",
+  "description": "Connect Google Sheets ministry registrations, send personalized welcome messages, and broadcast worship night and program updates to church members.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
