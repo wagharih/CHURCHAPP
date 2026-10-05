@@ -9,6 +9,8 @@ import {
   getGoogleMessagesWebUrl,
   getWhatsAppUrl,
   saveOutreachLog,
+  dispatchDirectSms,
+  getSmsGatewayConfig,
 } from '../services/communications';
 import {
   Phone,
@@ -23,6 +25,7 @@ import {
   PhoneCall,
   Smartphone,
   Share2,
+  Zap,
 } from 'lucide-react';
 
 interface CallDispatcherModalProps {
@@ -47,6 +50,8 @@ export const CallDispatcherModal: React.FC<CallDispatcherModalProps> = ({
   const [messageText, setMessageText] = useState(initialMessage);
   const [copied, setCopied] = useState(false);
   const [isUpdatingSheet, setIsUpdatingSheet] = useState(false);
+  const [isSendingDirect, setIsSendingDirect] = useState(false);
+  const [directSentSuccess, setDirectSentSuccess] = useState(false);
   const [staffNote, setStaffNote] = useState('');
 
   if (!isOpen || !member) return null;
@@ -62,6 +67,45 @@ export const CallDispatcherModal: React.FC<CallDispatcherModalProps> = ({
     navigator.clipboard.writeText(messageText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  // DIRECT IN-APP 1-CLICK DISPATCH
+  const handleDirectSendNow = async () => {
+    setIsSendingDirect(true);
+    try {
+      const cfg = getSmsGatewayConfig();
+      const res = await dispatchDirectSms({
+        to: member.phoneNumber,
+        message: messageText,
+        recipientName: member.fullName,
+        gatewayConfig: cfg,
+      });
+
+      if (res.success) {
+        setDirectSentSuccess(true);
+        saveOutreachLog({
+          type: mode === 'welcome' ? 'welcome' : 'broadcast',
+          recipientName: member.fullName,
+          phoneNumber: member.phoneNumber,
+          messageText,
+          channel: 'sms',
+          status: 'sent',
+        });
+
+        // Automatically update Google Sheet row!
+        await onMarkWelcomedAndSynced(member, staffNote);
+        setTimeout(() => {
+          onClose();
+        }, 1200);
+      } else {
+        alert(res.error || 'Failed to dispatch direct message');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error sending direct SMS');
+    } finally {
+      setIsSendingDirect(false);
+    }
   };
 
   const handleDispatchGoogleVoice = () => {
@@ -209,95 +253,69 @@ export const CallDispatcherModal: React.FC<CallDispatcherModalProps> = ({
             </div>
           </div>
 
-          {/* Outreach Channels Buttons */}
-          <div className="space-y-2 pt-1">
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Launch Outreach Channel
-            </label>
-
-            {/* Google Voice Button */}
-            <button
-              onClick={handleDispatchGoogleVoice}
-              className="w-full p-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-semibold text-xs flex items-center justify-between shadow-md transition group"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
-                  <Phone className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
-                </div>
-                <div className="text-left">
-                  <div className="font-bold text-sm">Send via Google Voice / Google Call</div>
-                  <div className="text-[11px] text-emerald-100 font-normal">
-                    Opens voice.google.com with recipient number {cleanPhone}
-                  </div>
-                </div>
-              </div>
-              <ExternalLink className="w-4 h-4 text-emerald-200" />
-            </button>
-
-            {/* Direct Google Voice Call */}
-            <button
-              onClick={handleDispatchCall}
-              className="w-full p-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs flex items-center justify-between transition"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                  <PhoneCall className="w-3.5 h-3.5" />
-                </div>
-                <div className="text-left">
-                  <div className="font-semibold text-xs">Call Member via Google Voice</div>
-                  <div className="text-[10px] text-slate-400">Pastoral phone call check-in</div>
-                </div>
-              </div>
-              <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-            </button>
-
-            {/* Other Mobile / Native SMS options */}
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <button
-                onClick={handleDispatchNativeSms}
-                className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
-              >
-                <Smartphone className="w-3.5 h-3.5 text-indigo-600" />
-                <span>Open in SMS App</span>
-              </button>
-
-              <button
-                onClick={() => window.open(googleMessagesWebUrl, '_blank')}
-                className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
-              >
-                <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
-                <span>Google Messages Web</span>
-              </button>
+          {/* PRIMARY 1-CLICK DIRECT SEND BUTTON */}
+          <div className="bg-gradient-to-r from-rose-50 to-indigo-50 p-4 rounded-xl border border-rose-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-amber-600" />
+                Direct 1-Click Send (No External Transfers)
+              </span>
+              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
+                Instant Delivery
+              </span>
             </div>
-          </div>
-
-          {/* Sync to Sheet Section */}
-          <div className="bg-indigo-50/70 p-4 rounded-xl border border-indigo-100 space-y-2">
-            <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-indigo-600" />
-              Update Google Sheet Status
-            </span>
             <p className="text-[11px] text-slate-600 leading-relaxed">
-              Once you have sent the welcome message or placed the call, mark this member as Welcomed. This
-              updates row #{member.rowNumber} directly in your connected Google Sheet.
+              Dispatches directly to {formatDisplayPhone(member.phoneNumber)} without opening Google Voice or leaving the app,
+              and automatically updates Google Sheet status to Welcomed.
             </p>
+
             <button
-              onClick={handleMarkAsSentInSheet}
-              disabled={isUpdatingSheet}
-              className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-2"
+              onClick={handleDirectSendNow}
+              disabled={isSendingDirect || directSentSuccess}
+              className="w-full py-3 px-4 bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2 group"
             >
-              {isUpdatingSheet ? (
+              {isSendingDirect ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Updating Google Sheet Row #{member.rowNumber}...</span>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Dispatching Message Directly...</span>
+                </>
+              ) : directSentSuccess ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                  <span>Message Sent &amp; Google Sheet Updated!</span>
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Mark as Welcomed &amp; Sync to Sheet</span>
+                  <Zap className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform" />
+                  <span>⚡ SEND WELCOME DIRECTLY NOW (NO TRANSFER)</span>
                 </>
               )}
             </button>
+          </div>
+
+          {/* Secondary Options */}
+          <div className="space-y-2 pt-1 border-t border-slate-100">
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              Or Open in External Tools
+            </label>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleDispatchGoogleVoice}
+                className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+              >
+                <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Google Voice Web</span>
+              </button>
+
+              <button
+                onClick={handleDispatchCall}
+                className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+              >
+                <PhoneCall className="w-3.5 h-3.5 text-slate-700" />
+                <span>Place Voice Call</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

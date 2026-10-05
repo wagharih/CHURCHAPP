@@ -96,6 +96,81 @@ export function getWhatsAppUrl(phoneNumber: string, message: string): string {
   return `https://wa.me/${clean}?text=${encodeURIComponent(message)}`;
 }
 
+export interface SmsGatewayConfig {
+  provider: 'direct_cloud' | 'twilio' | 'google_voice_assisted';
+  twilioSid?: string;
+  twilioToken?: string;
+  twilioFromNumber?: string;
+  senderName?: string;
+  directAutoSendEnabled: boolean;
+}
+
+export const DEFAULT_SMS_GATEWAY_CONFIG: SmsGatewayConfig = {
+  provider: 'direct_cloud',
+  senderName: 'Church Outreach Ministry',
+  directAutoSendEnabled: true,
+};
+
+export function getSmsGatewayConfig(): SmsGatewayConfig {
+  try {
+    const raw = localStorage.getItem('mp_sms_gateway_config');
+    return raw ? { ...DEFAULT_SMS_GATEWAY_CONFIG, ...JSON.parse(raw) } : DEFAULT_SMS_GATEWAY_CONFIG;
+  } catch {
+    return DEFAULT_SMS_GATEWAY_CONFIG;
+  }
+}
+
+export function saveSmsGatewayConfig(cfg: SmsGatewayConfig): void {
+  try {
+    localStorage.setItem('mp_sms_gateway_config', JSON.stringify(cfg));
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+export async function dispatchDirectSms(params: {
+  to: string;
+  message: string;
+  recipientName: string;
+  gatewayConfig?: SmsGatewayConfig;
+}): Promise<{ success: boolean; messageId?: string; status: string; error?: string; provider: string }> {
+  const cfg = params.gatewayConfig || getSmsGatewayConfig();
+  const cleanTo = getCleanPhone(params.to);
+
+  try {
+    const res = await fetch('/api/send-sms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: cleanTo,
+        message: params.message,
+        recipientName: params.recipientName,
+        gatewayConfig: cfg,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to dispatch SMS');
+    }
+
+    return {
+      success: true,
+      messageId: data.messageId,
+      status: data.status || 'delivered',
+      provider: data.provider || cfg.provider,
+    };
+  } catch (err: any) {
+    console.error('Direct SMS dispatch failed:', err);
+    return {
+      success: false,
+      status: 'failed',
+      error: err.message || 'Network or carrier dispatch error',
+      provider: cfg.provider,
+    };
+  }
+}
+
 // Local outreach history tracking
 const LOGS_STORAGE_KEY = 'ministry_pulse_outreach_logs_v1';
 

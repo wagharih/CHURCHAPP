@@ -17,6 +17,7 @@ import {
   AlertCircle,
   HelpCircle,
   Wand2,
+  Zap,
 } from 'lucide-react';
 
 interface WelcomeManagerProps {
@@ -298,10 +299,10 @@ export const WelcomeManager: React.FC<WelcomeManagerProps> = ({
                 <button
                   onClick={() => onBatchWelcomeAll(pendingMembers)}
                   disabled={isProcessingBatch}
-                  className="py-1.5 px-3 bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-700 hover:to-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition disabled:opacity-50 flex items-center gap-1.5"
+                  className="py-2 px-3.5 bg-gradient-to-r from-rose-600 via-amber-600 to-indigo-600 hover:from-rose-700 hover:via-amber-700 hover:to-indigo-700 text-white rounded-xl text-xs font-extrabold shadow-md transition disabled:opacity-50 flex items-center gap-1.5 group"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{isProcessingBatch ? 'Processing...' : `Welcome All (${pendingMembers.length})`}</span>
+                  <Zap className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform" />
+                  <span>⚡ Auto-Send All Welcomes Directly ({pendingMembers.length})</span>
                 </button>
               )}
             </div>

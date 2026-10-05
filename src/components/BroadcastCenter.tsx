@@ -16,6 +16,7 @@ import {
   RefreshCw,
   MessageSquare,
   AlertTriangle,
+  Zap,
 } from 'lucide-react';
 
 interface BroadcastCenterProps {
@@ -310,10 +311,10 @@ export const BroadcastCenter: React.FC<BroadcastCenterProps> = ({
                   }
                 }}
                 disabled={recipientMembers.length === 0}
-                className="w-full sm:w-auto py-2.5 px-6 bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-700 hover:to-rose-700 text-white rounded-xl text-xs font-bold shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full sm:w-auto py-3 px-6 bg-gradient-to-r from-amber-600 via-rose-600 to-indigo-600 hover:from-amber-700 hover:via-rose-700 hover:to-indigo-700 text-white rounded-xl text-xs font-extrabold shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2 group"
               >
-                <Send className="w-4 h-4" />
-                <span>Launch Broadcast ({recipientMembers.length} Members)</span>
+                <Zap className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform" />
+                <span>⚡ SEND MASS MESSAGES DIRECTLY ({recipientMembers.length} MEMBERS)</span>
               </button>
             </div>
           </div>

@@ -22,6 +22,9 @@ import {
   replaceMessageVariables,
   getOutreachLogs,
   clearOutreachLogs,
+  SmsGatewayConfig,
+  getSmsGatewayConfig,
+  saveSmsGatewayConfig,
 } from './services/communications';
 import { getFormResponses, createMinistryGoogleForm } from './services/forms';
 import { MemberRecord, ChurchEvent, OutreachLog, GoogleFormInfo, GoogleFormResponse } from './types';
@@ -101,6 +104,7 @@ export default function App() {
   const [outreachLogs, setOutreachLogs] = useState<OutreachLog[]>(getOutreachLogs);
 
   // UI state
+  const [gatewayConfig, setGatewayConfig] = useState<SmsGatewayConfig>(getSmsGatewayConfig);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isSheetModalOpen, setIsSheetModalOpen] = useState(false);
@@ -774,6 +778,108 @@ export default function App() {
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Direct Mass Messaging & Telecom Gateway Settings */}
+            <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <h3 className="text-sm font-bold text-slate-900">
+                      ⚡ Direct Mass SMS Dispatch Engine (Zero Google Voice Transfers)
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed max-w-2xl">
+                    Allows church staff to push <strong>"⚡ Send Mass Messages"</strong> or <strong>"⚡ Auto-Send All Welcomes"</strong> and
+                    have the system automatically dispatch messages in sequence directly to member numbers without opening external tabs or transferring to Google Voice.
+                  </p>
+                </div>
+                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 uppercase tracking-wider flex-shrink-0 self-start">
+                  Active
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-200">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Mass Dispatch Delivery Mode
+                  </label>
+                  <select
+                    value={gatewayConfig.provider}
+                    onChange={e => {
+                      const updated: SmsGatewayConfig = { ...gatewayConfig, provider: e.target.value as any };
+                      setGatewayConfig(updated);
+                      saveSmsGatewayConfig(updated);
+                    }}
+                    className="w-full px-3 py-2 text-xs font-medium bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="direct_cloud">⚡ Direct In-App Cloud SMS (Automatic, No Transfers)</option>
+                    <option value="twilio">Twilio Carrier Gateway (Custom Church Line)</option>
+                    <option value="google_voice_assisted">Google Voice Assisted (Manual External Tabs)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Church Sender Display Title
+                  </label>
+                  <input
+                    type="text"
+                    value={gatewayConfig.senderName || ''}
+                    onChange={e => {
+                      const updated: SmsGatewayConfig = { ...gatewayConfig, senderName: e.target.value };
+                      setGatewayConfig(updated);
+                      saveSmsGatewayConfig(updated);
+                    }}
+                    placeholder="e.g. Grace Harvest Pastoral Team"
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg"
+                  />
+                </div>
+              </div>
+
+              {gatewayConfig.provider === 'twilio' && (
+                <div className="p-3.5 bg-white rounded-lg border border-slate-200 space-y-2">
+                  <div className="text-xs font-bold text-slate-800">
+                    Twilio Church Line Credentials (Optional)
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Account SID"
+                      value={gatewayConfig.twilioSid || ''}
+                      onChange={e => {
+                        const updated = { ...gatewayConfig, twilioSid: e.target.value };
+                        setGatewayConfig(updated);
+                        saveSmsGatewayConfig(updated);
+                      }}
+                      className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-md font-mono"
+                    />
+                    <input
+                      type="password"
+                      placeholder="Auth Token"
+                      value={gatewayConfig.twilioToken || ''}
+                      onChange={e => {
+                        const updated = { ...gatewayConfig, twilioToken: e.target.value };
+                        setGatewayConfig(updated);
+                        saveSmsGatewayConfig(updated);
+                      }}
+                      className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-md font-mono"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Church Phone (+1...)"
+                      value={gatewayConfig.twilioFromNumber || ''}
+                      onChange={e => {
+                        const updated = { ...gatewayConfig, twilioFromNumber: e.target.value };
+                        setGatewayConfig(updated);
+                        saveSmsGatewayConfig(updated);
+                      }}
+                      className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-md font-mono"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
