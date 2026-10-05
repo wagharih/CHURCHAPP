@@ -14,7 +14,9 @@ import {
   CheckCircle2,
   AlertCircle,
   HelpCircle,
+  Phone,
 } from 'lucide-react';
+import { formatDisplayPhone } from '../services/communications';
 
 interface HeaderProps {
   user: User | null;
@@ -25,8 +27,10 @@ interface HeaderProps {
   currentSheetName: string | null;
   currentTabName: string | null;
   currentFormTitle: string | null;
+  googleVoiceNumber: string | null;
   onOpenSheetSelector: () => void;
   onOpenFormSelector: () => void;
+  onOpenGoogleVoiceSetup: () => void;
   onSync: () => void;
   isSyncing: boolean;
   activeTab: 'members' | 'forms' | 'welcome' | 'broadcast' | 'logs' | 'sheet';
@@ -46,8 +50,10 @@ export const Header: React.FC<HeaderProps> = ({
   currentSheetName,
   currentTabName,
   currentFormTitle,
+  googleVoiceNumber,
   onOpenSheetSelector,
   onOpenFormSelector,
+  onOpenGoogleVoiceSetup,
   onSync,
   isSyncing,
   activeTab,
@@ -82,8 +88,32 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Right Side: Google Form & Sheet Status & Google Sign In Button */}
+          {/* Right Side: Google Voice, Form & Sheet Status & Google Sign In Button */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Google Voice Line Badge */}
+            <button
+              onClick={onOpenGoogleVoiceSetup}
+              className={`flex items-center gap-1.5 text-xs py-1.5 px-2.5 rounded-lg border transition cursor-pointer ${
+                googleVoiceNumber
+                  ? 'bg-slate-800/80 hover:bg-slate-800 text-slate-200 border-slate-700'
+                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30 font-semibold'
+              }`}
+              title="Add or configure church Google Voice number for Caller ID & replies"
+            >
+              <Phone className="w-3.5 h-3.5 text-emerald-400" />
+              <div className="text-left hidden lg:block">
+                <div className="text-[10px] uppercase font-semibold text-slate-400 leading-none">
+                  Google Voice Line
+                </div>
+                <div className="font-medium text-emerald-300 font-mono truncate max-w-[140px]">
+                  {googleVoiceNumber ? formatDisplayPhone(googleVoiceNumber) : '+ Add Google Voice'}
+                </div>
+              </div>
+              <span className="lg:hidden text-xs font-semibold text-emerald-300">
+                {googleVoiceNumber ? 'GV Line' : '+ Add Voice'}
+              </span>
+            </button>
+
             {/* Form Connection Status Badge */}
             {hasToken && (
               <button
@@ -280,6 +310,9 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Calendar className="w-4 h-4" />
             <span>Worship Nights &amp; Broadcasts</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-bold border border-amber-400/30">
+              ⚡ Mass Send
+            </span>
           </button>
 
           {/* Outreach History */}

@@ -48,6 +48,7 @@ import { OutreachLogsView } from './components/OutreachLogsView';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { FormsHub } from './components/FormsHub';
 import { FormSelectorModal } from './components/FormSelectorModal';
+import { GoogleVoiceSetupModal } from './components/GoogleVoiceSetupModal';
 
 export default function App() {
   // Auth state
@@ -108,6 +109,7 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isSheetModalOpen, setIsSheetModalOpen] = useState(false);
+  const [isGoogleVoiceModalOpen, setIsGoogleVoiceModalOpen] = useState(false);
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [memberToEdit, setMemberToEdit] = useState<MemberRecord | null>(null);
   const [isSavingMember, setIsSavingMember] = useState(false);
@@ -487,24 +489,14 @@ export default function App() {
     );
   };
 
-  // Batch Welcome All Pending
+  // Batch Welcome All Pending (Direct 1-Click Mass Send)
   const handleBatchWelcomeAll = (pendingMembers: MemberRecord[]) => {
-    setConfirmationData({
-      isOpen: true,
-      title: 'Batch Welcome Outreach',
-      description: `You are about to launch welcome outreach for all ${pendingMembers.length} pending church registrations. This will open the step-through dispatcher and update each member's status in Google Sheets.`,
-      affectedCount: pendingMembers.length,
-      confirmLabel: 'Proceed with Batch Welcome',
-      onConfirm: () => {
-        setConfirmationData(prev => ({ ...prev, isOpen: false }));
-        setBatchRunnerTitle(`Batch Welcome Outreach (${pendingMembers.length} Members)`);
-        setBatchRecipients(pendingMembers);
-        setBatchTemplate(welcomeTemplate);
-        setBatchEvent(undefined);
-        setBatchMode('welcome');
-        setBatchRunnerOpen(true);
-      },
-    });
+    setBatchRunnerTitle(`Batch Welcome Outreach (${pendingMembers.length} Members)`);
+    setBatchRecipients(pendingMembers);
+    setBatchTemplate(welcomeTemplate);
+    setBatchEvent(undefined);
+    setBatchMode('welcome');
+    setBatchRunnerOpen(true);
   };
 
   // Complete batch in sheet
@@ -527,28 +519,18 @@ export default function App() {
     );
   };
 
-  // Launch Weekly Broadcast for selected Church Event
+  // Launch Weekly Broadcast for selected Church Event (Direct 1-Click Mass Send)
   const handleRunBroadcast = (
     event: ChurchEvent,
     targetMembers: MemberRecord[],
     messageTemplate: string
   ) => {
-    setConfirmationData({
-      isOpen: true,
-      title: `Broadcast: ${event.title}`,
-      description: `You are about to launch a broadcast announcement for "${event.title}" to ${targetMembers.length} church members. This operation will update the "Last Broadcast Date" for all recipients in your connected Google Sheet.`,
-      affectedCount: targetMembers.length,
-      confirmLabel: 'Launch Weekly Broadcast',
-      onConfirm: () => {
-        setConfirmationData(prev => ({ ...prev, isOpen: false }));
-        setBatchRunnerTitle(`Broadcast: ${event.title}`);
-        setBatchRecipients(targetMembers);
-        setBatchTemplate(messageTemplate);
-        setBatchEvent(event);
-        setBatchMode('broadcast');
-        setBatchRunnerOpen(true);
-      },
-    });
+    setBatchRunnerTitle(`Broadcast: ${event.title}`);
+    setBatchRecipients(targetMembers);
+    setBatchTemplate(messageTemplate);
+    setBatchEvent(event);
+    setBatchMode('broadcast');
+    setBatchRunnerOpen(true);
   };
 
   // Complete broadcast in sheet
@@ -599,8 +581,10 @@ export default function App() {
         currentSheetName={currentSheetTitle}
         currentTabName={currentTabName}
         currentFormTitle={currentForm?.title || null}
+        googleVoiceNumber={gatewayConfig.googleVoiceNumber || null}
         onOpenSheetSelector={() => setIsSheetModalOpen(true)}
         onOpenFormSelector={() => setIsFormSelectorOpen(true)}
+        onOpenGoogleVoiceSetup={() => setIsGoogleVoiceModalOpen(true)}
         onSync={handleSyncAll}
         isSyncing={isSyncing || isRefreshingForms}
         activeTab={activeTab}
@@ -962,6 +946,18 @@ export default function App() {
         onClose={() => setIsFormSelectorOpen(false)}
         accessToken={accessToken}
         onSelectForm={handleSelectForm}
+        churchName={churchName}
+      />
+
+      {/* 8. Google Voice Setup Modal */}
+      <GoogleVoiceSetupModal
+        isOpen={isGoogleVoiceModalOpen}
+        onClose={() => setIsGoogleVoiceModalOpen(false)}
+        gatewayConfig={gatewayConfig}
+        onSaveConfig={updated => {
+          setGatewayConfig(updated);
+          saveSmsGatewayConfig(updated);
+        }}
         churchName={churchName}
       />
     </div>

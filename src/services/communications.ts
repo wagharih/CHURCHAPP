@@ -35,6 +35,7 @@ export function replaceMessageVariables(
     event?: Partial<ChurchEvent>;
     customScripture?: string;
     staffName?: string;
+    googleVoiceNumber?: string;
   } = {}
 ): string {
   const churchName = options.churchName || 'Grace Fellowship Church';
@@ -42,6 +43,7 @@ export function replaceMessageVariables(
   const fullName = member.fullName || 'Beloved Friend';
   const ministry = member.ministry || 'Church Family';
   const scripture = options.customScripture || 'Romans 15:7 - "Accept one another, then, just as Christ accepted you, in order to bring praise to God."';
+  const gvNumber = options.googleVoiceNumber || getSmsGatewayConfig().googleVoiceNumber || '';
 
   let msg = template
     .replace(/{First_Name}/gi, firstName)
@@ -52,7 +54,11 @@ export function replaceMessageVariables(
     .replace(/{ChurchName}/gi, churchName)
     .replace(/{Ministry}/gi, ministry)
     .replace(/{Phone_Number}/gi, member.phoneNumber || '')
-    .replace(/{Scripture}/gi, scripture);
+    .replace(/{Scripture}/gi, scripture)
+    .replace(/{Church_Phone_Number}/gi, gvNumber || 'our church line')
+    .replace(/{Church_Phone}/gi, gvNumber || 'our church line')
+    .replace(/{Google_Voice_Number}/gi, gvNumber || 'our Google Voice line')
+    .replace(/{GoogleVoiceNumber}/gi, gvNumber || 'our Google Voice line');
 
   if (options.event) {
     msg = msg
@@ -98,6 +104,7 @@ export function getWhatsAppUrl(phoneNumber: string, message: string): string {
 
 export interface SmsGatewayConfig {
   provider: 'direct_cloud' | 'twilio' | 'google_voice_assisted';
+  googleVoiceNumber?: string;
   twilioSid?: string;
   twilioToken?: string;
   twilioFromNumber?: string;
@@ -107,6 +114,7 @@ export interface SmsGatewayConfig {
 
 export const DEFAULT_SMS_GATEWAY_CONFIG: SmsGatewayConfig = {
   provider: 'direct_cloud',
+  googleVoiceNumber: '',
   senderName: 'Church Outreach Ministry',
   directAutoSendEnabled: true,
 };

@@ -297,6 +297,16 @@ export const BroadcastCenter: React.FC<BroadcastCenterProps> = ({
               </div>
             </div>
 
+            {/* Direct Send Guarantee Banner */}
+            <div className="bg-emerald-50 border border-emerald-200/90 rounded-xl p-3 flex items-center gap-2.5">
+              <div className="p-1 rounded-full bg-emerald-100 text-emerald-700 flex-shrink-0">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+              <p className="text-[11px] text-emerald-900 leading-snug">
+                <strong>Direct In-App Delivery:</strong> Hitting the button below sends to all {recipientMembers.length} members directly from this screen in sequence. <strong>You will not be transferred to Google Voice.</strong>
+              </p>
+            </div>
+
             {/* Send Broadcast Action */}
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100">
               <div className="text-xs text-slate-500">
@@ -311,10 +321,10 @@ export const BroadcastCenter: React.FC<BroadcastCenterProps> = ({
                   }
                 }}
                 disabled={recipientMembers.length === 0}
-                className="w-full sm:w-auto py-3 px-6 bg-gradient-to-r from-amber-600 via-rose-600 to-indigo-600 hover:from-amber-700 hover:via-rose-700 hover:to-indigo-700 text-white rounded-xl text-xs font-extrabold shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2 group"
+                className="w-full sm:w-auto py-3 px-6 bg-gradient-to-r from-amber-600 via-rose-600 to-indigo-600 hover:from-amber-700 hover:via-rose-700 hover:to-indigo-700 text-white rounded-xl text-xs font-extrabold shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2 group cursor-pointer"
               >
                 <Zap className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform" />
-                <span>⚡ SEND MASS MESSAGES DIRECTLY ({recipientMembers.length} MEMBERS)</span>
+                <span>⚡ PUSH TO SEND MASS MESSAGES NOW ({recipientMembers.length} MEMBERS)</span>
               </button>
             </div>
           </div>

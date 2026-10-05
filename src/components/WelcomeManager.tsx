@@ -296,14 +296,20 @@ export const WelcomeManager: React.FC<WelcomeManagerProps> = ({
               </div>
 
               {pendingMembers.length > 0 && (
-                <button
-                  onClick={() => onBatchWelcomeAll(pendingMembers)}
-                  disabled={isProcessingBatch}
-                  className="py-2 px-3.5 bg-gradient-to-r from-rose-600 via-amber-600 to-indigo-600 hover:from-rose-700 hover:via-amber-700 hover:to-indigo-700 text-white rounded-xl text-xs font-extrabold shadow-md transition disabled:opacity-50 flex items-center gap-1.5 group"
-                >
-                  <Zap className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform" />
-                  <span>⚡ Auto-Send All Welcomes Directly ({pendingMembers.length})</span>
-                </button>
+                <div className="flex flex-col items-end gap-1">
+                  <button
+                    onClick={() => onBatchWelcomeAll(pendingMembers)}
+                    disabled={isProcessingBatch}
+                    className="py-2.5 px-4 bg-gradient-to-r from-rose-600 via-amber-600 to-indigo-600 hover:from-rose-700 hover:via-amber-700 hover:to-indigo-700 text-white rounded-xl text-xs font-extrabold shadow-md transition disabled:opacity-50 flex items-center gap-1.5 group cursor-pointer"
+                  >
+                    <Zap className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform" />
+                    <span>⚡ PUSH TO AUTO-SEND ALL WELCOMES ({pendingMembers.length})</span>
+                  </button>
+                  <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    Zero transfers • Sends directly in background
+                  </span>
+                </div>
               )}
             </div>
 
