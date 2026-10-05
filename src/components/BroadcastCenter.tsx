@@ -17,6 +17,7 @@ import {
   MessageSquare,
   AlertTriangle,
   Zap,
+  Phone,
 } from 'lucide-react';
 
 interface BroadcastCenterProps {
@@ -54,7 +55,8 @@ export const BroadcastCenter: React.FC<BroadcastCenterProps> = ({
   const [messageTemplate, setMessageTemplate] = useState<string>(defaultBroadcastTemplate);
 
   // Filter recipients based on selection
-  const recipientMembers = members.filter(m => {
+  const recipientMembers = (members || []).filter(m => {
+    if (!m || typeof m !== 'object') return false;
     if (targetAudience === 'all') return true;
     return m.ministry === targetAudience;
   });
@@ -297,13 +299,13 @@ export const BroadcastCenter: React.FC<BroadcastCenterProps> = ({
               </div>
             </div>
 
-            {/* Direct Send Guarantee Banner */}
+            {/* Google Voice Queue Banner */}
             <div className="bg-emerald-50 border border-emerald-200/90 rounded-xl p-3 flex items-center gap-2.5">
               <div className="p-1 rounded-full bg-emerald-100 text-emerald-700 flex-shrink-0">
-                <CheckCircle2 className="w-4 h-4" />
+                <Phone className="w-4 h-4" />
               </div>
               <p className="text-[11px] text-emerald-900 leading-snug">
-                <strong>Direct In-App Delivery:</strong> Hitting the button below sends to all {recipientMembers.length} members directly from this screen in sequence. <strong>You will not be transferred to Google Voice.</strong>
+                <strong>Google Voice Sequential Dispatcher:</strong> Routes messages to all {recipientMembers.length} members using your Google Voice line, one after the other. Each message is auto-copied to your clipboard ready to send!
               </p>
             </div>
 
@@ -321,10 +323,10 @@ export const BroadcastCenter: React.FC<BroadcastCenterProps> = ({
                   }
                 }}
                 disabled={recipientMembers.length === 0}
-                className="w-full sm:w-auto py-3 px-6 bg-gradient-to-r from-amber-600 via-rose-600 to-indigo-600 hover:from-amber-700 hover:via-rose-700 hover:to-indigo-700 text-white rounded-xl text-xs font-extrabold shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2 group cursor-pointer"
+                className="w-full sm:w-auto py-3 px-6 bg-gradient-to-r from-emerald-600 via-teal-700 to-indigo-800 hover:from-emerald-700 hover:via-teal-800 hover:to-indigo-900 text-white rounded-xl text-xs font-extrabold shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2 group cursor-pointer"
               >
-                <Zap className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform" />
-                <span>⚡ PUSH TO SEND MASS MESSAGES NOW ({recipientMembers.length} MEMBERS)</span>
+                <Phone className="w-4 h-4 text-emerald-200 group-hover:scale-110 transition-transform" />
+                <span>📞 LAUNCH GOOGLE VOICE SENDER ({recipientMembers.length} MEMBERS)</span>
               </button>
             </div>
           </div>

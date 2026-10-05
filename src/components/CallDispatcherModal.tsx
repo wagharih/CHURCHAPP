@@ -9,7 +9,6 @@ import {
   getGoogleMessagesWebUrl,
   getWhatsAppUrl,
   saveOutreachLog,
-  dispatchDirectSms,
   getSmsGatewayConfig,
 } from '../services/communications';
 import {
@@ -50,9 +49,8 @@ export const CallDispatcherModal: React.FC<CallDispatcherModalProps> = ({
   const [messageText, setMessageText] = useState(initialMessage);
   const [copied, setCopied] = useState(false);
   const [isUpdatingSheet, setIsUpdatingSheet] = useState(false);
-  const [isSendingDirect, setIsSendingDirect] = useState(false);
-  const [directSentSuccess, setDirectSentSuccess] = useState(false);
   const [staffNote, setStaffNote] = useState('');
+  const [sentNotice, setSentNotice] = useState(false);
 
   if (!isOpen || !member) return null;
 
@@ -60,8 +58,7 @@ export const CallDispatcherModal: React.FC<CallDispatcherModalProps> = ({
   const googleVoiceMsgUrl = getGoogleVoiceMessageUrl(member.phoneNumber);
   const googleVoiceCallUrl = getGoogleVoiceCallUrl(member.phoneNumber);
   const nativeSmsUrl = getNativeSmsUrl(member.phoneNumber, messageText);
-  const googleMessagesWebUrl = getGoogleMessagesWebUrl(member.phoneNumber);
-  const whatsappUrl = getWhatsAppUrl(member.phoneNumber, messageText);
+  const gatewayConfig = getSmsGatewayConfig();
 
   const handleCopyMessage = () => {
     navigator.clipboard.writeText(messageText);
@@ -69,83 +66,16 @@ export const CallDispatcherModal: React.FC<CallDispatcherModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // DIRECT IN-APP 1-CLICK DISPATCH
-  const handleDirectSendNow = async () => {
-    setIsSendingDirect(true);
-    try {
-      const cfg = getSmsGatewayConfig();
-      const res = await dispatchDirectSms({
-        to: member.phoneNumber,
-        message: messageText,
-        recipientName: member.fullName,
-        gatewayConfig: cfg,
-      });
+  // SEND VIA GOOGLE VOICE
+  const handleDispatchGoogleVoice = async () => {
+    // 1. Copy message text to clipboard
+    navigator.clipboard.writeText(messageText);
+    setCopied(true);
 
-      if (res.success) {
-        setDirectSentSuccess(true);
-        saveOutreachLog({
-          type: mode === 'welcome' ? 'welcome' : 'broadcast',
-          recipientName: member.fullName,
-          phoneNumber: member.phoneNumber,
-          messageText,
-          channel: 'sms',
-          status: 'sent',
-        });
-
-        // Automatically update Google Sheet row!
-        await onMarkWelcomedAndSynced(member, staffNote);
-        setTimeout(() => {
-          onClose();
-        }, 1200);
-      } else {
-        alert(res.error || 'Failed to dispatch direct message');
-      }
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message || 'Error sending direct SMS');
-    } finally {
-      setIsSendingDirect(false);
-    }
-  };
-
-  const handleDispatchGoogleVoice = () => {
-    handleCopyMessage();
-    saveOutreachLog({
-      type: mode === 'welcome' ? 'welcome' : 'broadcast',
-      recipientName: member.fullName,
-      phoneNumber: member.phoneNumber,
-      messageText,
-      channel: 'google_voice',
-      status: 'opened',
-    });
+    // 2. Open Google Voice directly to this member's chat
     window.open(googleVoiceMsgUrl, '_blank', 'noopener,noreferrer');
-  };
 
-  const handleDispatchCall = () => {
-    saveOutreachLog({
-      type: 'direct_call',
-      recipientName: member.fullName,
-      phoneNumber: member.phoneNumber,
-      messageText: `Pastoral call placed to ${member.fullName}`,
-      channel: 'phone_call',
-      status: 'opened',
-    });
-    window.open(googleVoiceCallUrl, '_blank', 'noopener,noreferrer');
-  };
-
-  const handleDispatchNativeSms = () => {
-    saveOutreachLog({
-      type: mode === 'welcome' ? 'welcome' : 'broadcast',
-      recipientName: member.fullName,
-      phoneNumber: member.phoneNumber,
-      messageText,
-      channel: 'sms',
-      status: 'opened',
-    });
-    window.open(nativeSmsUrl, '_self');
-  };
-
-  const handleMarkAsSentInSheet = async () => {
+    // 3. Mark as welcomed/sent in Google Sheet
     setIsUpdatingSheet(true);
     try {
       await onMarkWelcomedAndSynced(member, staffNote);
@@ -155,9 +85,12 @@ export const CallDispatcherModal: React.FC<CallDispatcherModalProps> = ({
         phoneNumber: member.phoneNumber,
         messageText,
         channel: 'google_voice',
-        status: 'sent',
+        status: 'opened',
       });
-      onClose();
+      setSentNotice(true);
+      setTimeout(() => {
+        onClose();
+      }, 1400);
     } catch (err) {
       console.error(err);
     } finally {
@@ -165,24 +98,62 @@ export const CallDispatcherModal: React.FC<CallDispatcherModalProps> = ({
     }
   };
 
+  // SEND VIA PHONE SMS APP (Pre-fills message text)
+  const handleDispatchNativeSms = async () => {
+    window.open(nativeSmsUrl, '_self');
+    setIsUpdatingSheet(true);
+    try {
+      await onMarkWelcomedAndSynced(member, staffNote);
+      saveOutreachLog({
+        type: mode === 'welcome' ? 'welcome' : 'broadcast',
+        recipientName: member.fullName,
+        phoneNumber: member.phoneNumber,
+        messageText,
+        channel: 'sms',
+        status: 'opened',
+      });
+      setSentNotice(true);
+      setTimeout(() => {
+        onClose();
+      }, 1400);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUpdatingSheet(false);
+    }
+  };
+
+  // PLACE VOICE CALL
+  const handleDispatchCall = () => {
+    saveOutreachLog({
+      type: 'direct_call',
+      recipientName: member.fullName,
+      phoneNumber: member.phoneNumber,
+      messageText: `Pastoral check-in call with ${member.fullName}`,
+      channel: 'phone_call',
+      status: 'opened',
+    });
+    window.open(googleVoiceCallUrl, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-fade-in">
       <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="px-6 py-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-rose-950 text-white flex items-center justify-between">
+        <div className="px-6 py-4 bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-rose-400">
-              {mode === 'call' ? <PhoneCall className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
+            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-emerald-400">
+              {mode === 'call' ? <PhoneCall className="w-5 h-5" /> : <Phone className="w-5 h-5" />}
             </div>
             <div>
               <h2 className="text-base font-bold text-white">
                 {mode === 'welcome'
-                  ? 'Send Welcome Message'
+                  ? 'Send Welcome via Google Voice'
                   : mode === 'call'
                   ? 'Pastoral Call via Google Voice'
                   : 'Outreach Dispatcher'}
               </h2>
-              <p className="text-xs text-slate-300">
+              <p className="text-xs text-emerald-200">
                 Outreach to {member.fullName} ({member.ministry})
               </p>
             </div>
@@ -197,7 +168,7 @@ export const CallDispatcherModal: React.FC<CallDispatcherModalProps> = ({
 
         {/* Content */}
         <div className="p-6 space-y-4 overflow-y-auto flex-1">
-          {/* Member Card */}
+          {/* Recipient Details */}
           <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex items-center justify-between">
             <div>
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -220,18 +191,18 @@ export const CallDispatcherModal: React.FC<CallDispatcherModalProps> = ({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                <MessageSquare className="w-3.5 h-3.5 text-indigo-600" />
+                <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
                 Personalized Message Text
               </label>
               <button
                 type="button"
                 onClick={handleCopyMessage}
-                className="text-xs text-slate-600 hover:text-indigo-600 font-medium flex items-center gap-1"
+                className="text-xs text-slate-600 hover:text-emerald-700 font-medium flex items-center gap-1"
               >
                 {copied ? (
                   <>
                     <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    <span className="text-emerald-600">Copied to Clipboard!</span>
+                    <span className="text-emerald-600 font-bold">Copied to Clipboard!</span>
                   </>
                 ) : (
                   <>
@@ -245,7 +216,7 @@ export const CallDispatcherModal: React.FC<CallDispatcherModalProps> = ({
               rows={4}
               value={messageText}
               onChange={e => setMessageText(e.target.value)}
-              className="w-full p-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition leading-relaxed font-sans"
+              className="w-full p-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition leading-relaxed font-sans"
             />
             <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
               <span>Personalized for {member.fullName}</span>
@@ -253,69 +224,62 @@ export const CallDispatcherModal: React.FC<CallDispatcherModalProps> = ({
             </div>
           </div>
 
-          {/* PRIMARY 1-CLICK DIRECT SEND BUTTON */}
-          <div className="bg-gradient-to-r from-rose-50 to-indigo-50 p-4 rounded-xl border border-rose-200 space-y-2">
+          {/* PRIMARY GOOGLE VOICE DISPATCH BUTTON */}
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 space-y-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                <Zap className="w-4 h-4 text-amber-600" />
-                Direct 1-Click Send (No External Transfers)
+              <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                <Phone className="w-4 h-4 text-emerald-700" />
+                Send via Your Church Google Voice Line
               </span>
-              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
-                Instant Delivery
+              <span className="text-[10px] font-semibold text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-300">
+                {gatewayConfig.googleVoiceNumber ? formatDisplayPhone(gatewayConfig.googleVoiceNumber) : 'Caller ID Active'}
               </span>
             </div>
             <p className="text-[11px] text-slate-600 leading-relaxed">
-              Dispatches directly to {formatDisplayPhone(member.phoneNumber)} without opening Google Voice or leaving the app,
-              and automatically updates Google Sheet status to Welcomed.
+              Clicking below copies this message to your clipboard, opens Google Voice directly to {member.fullName}'s number, and marks their status in your Google Sheet!
             </p>
 
             <button
-              onClick={handleDirectSendNow}
-              disabled={isSendingDirect || directSentSuccess}
-              className="w-full py-3 px-4 bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2 group"
+              onClick={handleDispatchGoogleVoice}
+              disabled={isUpdatingSheet || sentNotice}
+              className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2 group cursor-pointer"
             >
-              {isSendingDirect ? (
+              {sentNotice ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Dispatching Message Directly...</span>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                  <span>Opened in Google Voice &amp; Sheet Updated!</span>
                 </>
-              ) : directSentSuccess ? (
+              ) : isUpdatingSheet ? (
                 <>
-                  <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                  <span>Message Sent &amp; Google Sheet Updated!</span>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Updating Sheet &amp; Opening...</span>
                 </>
               ) : (
                 <>
-                  <Zap className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform" />
-                  <span>⚡ SEND WELCOME DIRECTLY NOW (NO TRANSFER)</span>
+                  <Phone className="w-4 h-4 text-emerald-200 group-hover:scale-110 transition-transform" />
+                  <span>📞 OPEN IN GOOGLE VOICE &amp; COPY MESSAGE</span>
                 </>
               )}
             </button>
           </div>
 
-          {/* Secondary Options */}
-          <div className="space-y-2 pt-1 border-t border-slate-100">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Or Open in External Tools
-            </label>
+          {/* Secondary Dispatch Options */}
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button
+              onClick={handleDispatchNativeSms}
+              className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Open in Phone SMS</span>
+            </button>
 
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={handleDispatchGoogleVoice}
-                className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
-              >
-                <Phone className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Google Voice Web</span>
-              </button>
-
-              <button
-                onClick={handleDispatchCall}
-                className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
-              >
-                <PhoneCall className="w-3.5 h-3.5 text-slate-700" />
-                <span>Place Voice Call</span>
-              </button>
-            </div>
+            <button
+              onClick={handleDispatchCall}
+              className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+            >
+              <PhoneCall className="w-3.5 h-3.5 text-slate-700" />
+              <span>Place Voice Call</span>
+            </button>
           </div>
         </div>
       </div>

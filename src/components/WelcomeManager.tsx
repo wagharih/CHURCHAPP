@@ -300,14 +300,14 @@ export const WelcomeManager: React.FC<WelcomeManagerProps> = ({
                   <button
                     onClick={() => onBatchWelcomeAll(pendingMembers)}
                     disabled={isProcessingBatch}
-                    className="py-2.5 px-4 bg-gradient-to-r from-rose-600 via-amber-600 to-indigo-600 hover:from-rose-700 hover:via-amber-700 hover:to-indigo-700 text-white rounded-xl text-xs font-extrabold shadow-md transition disabled:opacity-50 flex items-center gap-1.5 group cursor-pointer"
+                    className="py-2.5 px-4 bg-gradient-to-r from-emerald-600 via-teal-700 to-indigo-800 hover:from-emerald-700 hover:via-teal-800 hover:to-indigo-900 text-white rounded-xl text-xs font-extrabold shadow-md transition disabled:opacity-50 flex items-center gap-1.5 group cursor-pointer"
                   >
-                    <Zap className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform" />
-                    <span>⚡ PUSH TO AUTO-SEND ALL WELCOMES ({pendingMembers.length})</span>
+                    <Phone className="w-4 h-4 text-emerald-200 group-hover:scale-110 transition-transform" />
+                    <span>📞 SEND WELCOMES VIA GOOGLE VOICE ({pendingMembers.length})</span>
                   </button>
                   <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                    Zero transfers • Sends directly in background
+                    Routes through Google Voice, one after the other
                   </span>
                 </div>
               )}

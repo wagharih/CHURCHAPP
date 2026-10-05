@@ -491,8 +491,9 @@ export default function App() {
 
   // Batch Welcome All Pending (Direct 1-Click Mass Send)
   const handleBatchWelcomeAll = (pendingMembers: MemberRecord[]) => {
-    setBatchRunnerTitle(`Batch Welcome Outreach (${pendingMembers.length} Members)`);
-    setBatchRecipients(pendingMembers);
+    const validMembers = (pendingMembers || []).filter(m => Boolean(m && typeof m === 'object'));
+    setBatchRunnerTitle(`Batch Welcome Outreach (${validMembers.length} Members)`);
+    setBatchRecipients(validMembers);
     setBatchTemplate(welcomeTemplate);
     setBatchEvent(undefined);
     setBatchMode('welcome');
@@ -504,6 +505,7 @@ export default function App() {
     const token = accessToken || getAccessToken();
     if (token && currentSheetId && currentTabName) {
       for (const m of recipients) {
+        if (!m || !m.rowNumber) continue;
         try {
           await updateCellInSheet(token, currentSheetId, currentTabName, m.rowNumber, 4, 'Welcomed');
         } catch (err) {
@@ -513,7 +515,7 @@ export default function App() {
     }
 
     // Update local state
-    const ids = new Set(recipients.map(r => r.id));
+    const ids = new Set(recipients.filter(Boolean).map(r => r.id));
     setMembers(prev =>
       prev.map(m => (ids.has(m.id) ? { ...m, welcomeStatus: 'Welcomed' } : m))
     );
@@ -525,9 +527,10 @@ export default function App() {
     targetMembers: MemberRecord[],
     messageTemplate: string
   ) => {
-    setBatchRunnerTitle(`Broadcast: ${event.title}`);
-    setBatchRecipients(targetMembers);
-    setBatchTemplate(messageTemplate);
+    const validMembers = (targetMembers || []).filter(m => Boolean(m && typeof m === 'object'));
+    setBatchRunnerTitle(`Broadcast: ${event?.title || 'Church Broadcast'}`);
+    setBatchRecipients(validMembers);
+    setBatchTemplate(messageTemplate || '');
     setBatchEvent(event);
     setBatchMode('broadcast');
     setBatchRunnerOpen(true);
@@ -540,6 +543,7 @@ export default function App() {
 
     if (token && currentSheetId && currentTabName) {
       for (const m of recipients) {
+        if (!m || !m.rowNumber) continue;
         try {
           // Col 5 is typically Last Broadcast Date
           await updateCellInSheet(token, currentSheetId, currentTabName, m.rowNumber, 5, today);
@@ -550,7 +554,7 @@ export default function App() {
     }
 
     // Update local state
-    const ids = new Set(recipients.map(r => r.id));
+    const ids = new Set(recipients.filter(Boolean).map(r => r.id));
     setMembers(prev =>
       prev.map(m => (ids.has(m.id) ? { ...m, lastBroadcastDate: today } : m))
     );

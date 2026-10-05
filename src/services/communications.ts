@@ -29,7 +29,7 @@ export function getFirstName(fullName: string): string {
 
 export function replaceMessageVariables(
   template: string,
-  member: Partial<MemberRecord>,
+  member?: Partial<MemberRecord> | null,
   options: {
     churchName?: string;
     event?: Partial<ChurchEvent>;
@@ -38,14 +38,15 @@ export function replaceMessageVariables(
     googleVoiceNumber?: string;
   } = {}
 ): string {
-  const churchName = options.churchName || 'Grace Fellowship Church';
-  const firstName = member.fullName ? getFirstName(member.fullName) : 'Beloved Friend';
-  const fullName = member.fullName || 'Beloved Friend';
-  const ministry = member.ministry || 'Church Family';
-  const scripture = options.customScripture || 'Romans 15:7 - "Accept one another, then, just as Christ accepted you, in order to bring praise to God."';
-  const gvNumber = options.googleVoiceNumber || getSmsGatewayConfig().googleVoiceNumber || '';
+  const safeMember = member || {};
+  const churchName = options?.churchName || 'Grace Fellowship Church';
+  const firstName = safeMember.fullName ? getFirstName(safeMember.fullName) : 'Beloved Friend';
+  const fullName = safeMember.fullName || 'Beloved Friend';
+  const ministry = safeMember.ministry || 'Church Family';
+  const scripture = options?.customScripture || 'Romans 15:7 - "Accept one another, then, just as Christ accepted you, in order to bring praise to God."';
+  const gvNumber = options?.googleVoiceNumber || getSmsGatewayConfig().googleVoiceNumber || '';
 
-  let msg = template
+  let msg = (template || '')
     .replace(/{First_Name}/gi, firstName)
     .replace(/{FirstName}/gi, firstName)
     .replace(/{Full_Name}/gi, fullName)
@@ -53,7 +54,7 @@ export function replaceMessageVariables(
     .replace(/{Church_Name}/gi, churchName)
     .replace(/{ChurchName}/gi, churchName)
     .replace(/{Ministry}/gi, ministry)
-    .replace(/{Phone_Number}/gi, member.phoneNumber || '')
+    .replace(/{Phone_Number}/gi, safeMember.phoneNumber || '')
     .replace(/{Scripture}/gi, scripture)
     .replace(/{Church_Phone_Number}/gi, gvNumber || 'our church line')
     .replace(/{Church_Phone}/gi, gvNumber || 'our church line')
