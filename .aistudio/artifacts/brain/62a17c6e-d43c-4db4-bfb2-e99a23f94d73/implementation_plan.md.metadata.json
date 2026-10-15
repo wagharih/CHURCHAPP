@@ -1,0 +1,6 @@
+{
+  "summary": "Implementation plan for Church Google Voice email routing and multi-account sign-in support. Enables entering the church email for automatic Google authuser routing on text/broadcast links and provides complete team sign-in guidance.",
+  "updatedAt": "2026-10-15T03:57:15.152607201Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

@@ -17,6 +17,7 @@ import {
   Calendar,
   AlertCircle,
   Zap,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface MemberListProps {
@@ -28,6 +29,7 @@ interface MemberListProps {
   isSyncing: boolean;
   hasGoogleSheet: boolean;
   currentSheetName: string | null;
+  onOpenTesterManager?: () => void;
 }
 
 export const MemberList: React.FC<MemberListProps> = ({
@@ -39,6 +41,7 @@ export const MemberList: React.FC<MemberListProps> = ({
   isSyncing,
   hasGoogleSheet,
   currentSheetName,
+  onOpenTesterManager,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'welcomed'>('all');
@@ -210,6 +213,19 @@ export const MemberList: React.FC<MemberListProps> = ({
                 </option>
               ))}
             </select>
+
+            {/* Manage Testers Button */}
+            {onOpenTesterManager && (
+              <button
+                type="button"
+                onClick={onOpenTesterManager}
+                className="flex items-center gap-1.5 py-2 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-lg text-xs font-bold transition shadow-sm"
+                title="Manage verified tester phone numbers to test SMS"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                <span>🧪 Testers</span>
+              </button>
+            )}
 
             {/* Primary Add Button */}
             <button

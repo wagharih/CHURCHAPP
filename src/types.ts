@@ -9,6 +9,9 @@ export interface MemberRecord {
   welcomeStatus: 'Pending' | 'Welcomed' | string;
   lastBroadcastDate?: string;
   notes?: string;
+  isTester?: boolean;
+  checkIns?: string[]; // Array of ISO date strings
+  lastCheckInDate?: string;
   rawValues?: string[];
 }
 
@@ -87,5 +90,42 @@ export interface GoogleFormResponse {
   extractedPhone?: string;
   extractedMinistry?: string;
   extractedNotes?: string;
+}
+
+export interface CheckInRecord {
+  id: string;
+  memberId?: string;
+  fullName: string;
+  phoneNumber: string;
+  cleanPhone: string;
+  timestamp: string;
+  date: string; // YYYY-MM-DD
+  ministry?: string;
+  isFirstTimer: boolean;
+  notes?: string;
+  eventName?: string;
+}
+
+export interface TesterContact {
+  id: string;
+  name: string;
+  phoneNumber: string;
+  cleanPhone: string;
+  role?: string;
+  notes?: string;
+  addedAt: string;
+}
+
+export interface SmsGatewayConfig {
+  provider: 'direct_cloud' | 'twilio' | 'google_voice_assisted';
+  googleVoiceNumber?: string;
+  googleVoiceEmail?: string;
+  googleVoiceSlot?: number;
+  googleVoiceRoutingMode?: 'email' | 'slot';
+  twilioSid?: string;
+  twilioToken?: string;
+  twilioFromNumber?: string;
+  senderName?: string;
+  directAutoSendEnabled: boolean;
 }
 

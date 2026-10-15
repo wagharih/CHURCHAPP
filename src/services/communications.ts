@@ -1,4 +1,4 @@
-import { MemberRecord, ChurchEvent, OutreachLog } from '../types';
+import { MemberRecord, ChurchEvent, OutreachLog, CheckInRecord, TesterContact } from '../types';
 
 export function getCleanPhone(phone: string): string {
   // Strip parentheses, spaces, hyphens, keep leading + if present
@@ -73,19 +73,71 @@ export function replaceMessageVariables(
   return msg.trim();
 }
 
-/**
- * Google Voice Web URLs:
- * Messaging: https://voice.google.com/u/0/messages?query=<phone>
- * Calling: https://voice.google.com/calls?number=<phone>
- */
-export function getGoogleVoiceMessageUrl(phoneNumber: string): string {
-  const clean = getCleanPhone(phoneNumber);
-  return `https://voice.google.com/u/0/messages?query=${encodeURIComponent(clean)}`;
+export interface SmsGatewayConfig {
+  provider: 'direct_cloud' | 'twilio' | 'google_voice_assisted';
+  googleVoiceNumber?: string;
+  googleVoiceEmail?: string;
+  googleVoiceSlot?: number;
+  googleVoiceRoutingMode?: 'email' | 'slot';
+  twilioSid?: string;
+  twilioToken?: string;
+  twilioFromNumber?: string;
+  senderName?: string;
+  directAutoSendEnabled: boolean;
 }
 
-export function getGoogleVoiceCallUrl(phoneNumber: string): string {
+export const DEFAULT_SMS_GATEWAY_CONFIG: SmsGatewayConfig = {
+  provider: 'direct_cloud',
+  googleVoiceNumber: '',
+  googleVoiceEmail: '',
+  googleVoiceSlot: 0,
+  googleVoiceRoutingMode: 'email',
+  senderName: 'Church Outreach Ministry',
+  directAutoSendEnabled: true,
+};
+
+export function getSmsGatewayConfig(): SmsGatewayConfig {
+  try {
+    const raw = localStorage.getItem('mp_sms_gateway_config');
+    return raw ? { ...DEFAULT_SMS_GATEWAY_CONFIG, ...JSON.parse(raw) } : DEFAULT_SMS_GATEWAY_CONFIG;
+  } catch {
+    return DEFAULT_SMS_GATEWAY_CONFIG;
+  }
+}
+
+/**
+ * Google Voice Web URLs:
+ * Direct routing supports either:
+ * 1) authuser=<churchEmail> (routes directly to the matching church Google session)
+ * 2) slot /u/<index>/ (fallback for account slot order)
+ */
+export function getGoogleVoiceMessageUrl(phoneNumber: string, config?: SmsGatewayConfig): string {
   const clean = getCleanPhone(phoneNumber);
-  return `https://voice.google.com/calls?number=${encodeURIComponent(clean)}`;
+  const cfg = config || getSmsGatewayConfig();
+  const cleanParam = encodeURIComponent(clean);
+  const slot = typeof cfg.googleVoiceSlot === 'number' && !isNaN(cfg.googleVoiceSlot) ? cfg.googleVoiceSlot : 0;
+  const churchEmail = (cfg.googleVoiceEmail || '').trim();
+
+  // If church email is provided and routing mode is 'email' (or default), use authuser for exact profile matching
+  if (churchEmail && cfg.googleVoiceRoutingMode !== 'slot') {
+    return `https://voice.google.com/u/${slot}/messages?query=${cleanParam}&authuser=${encodeURIComponent(churchEmail)}`;
+  }
+
+  return `https://voice.google.com/u/${slot}/messages?query=${cleanParam}`;
+}
+
+export function getGoogleVoiceCallUrl(phoneNumber: string, config?: SmsGatewayConfig): string {
+  const clean = getCleanPhone(phoneNumber);
+  const cfg = config || getSmsGatewayConfig();
+  const cleanParam = encodeURIComponent(clean);
+  const slot = typeof cfg.googleVoiceSlot === 'number' && !isNaN(cfg.googleVoiceSlot) ? cfg.googleVoiceSlot : 0;
+  const churchEmail = (cfg.googleVoiceEmail || '').trim();
+
+  if (churchEmail && cfg.googleVoiceRoutingMode !== 'slot') {
+    return `https://voice.google.com/u/${slot}/calls?number=${cleanParam}&authuser=${encodeURIComponent(churchEmail)}`;
+  }
+
+  return `https://voice.google.com/u/${slot}/calls?number=${cleanParam}`;
 }
 
 export function getNativeSmsUrl(phoneNumber: string, message: string): string {
@@ -101,32 +153,6 @@ export function getGoogleMessagesWebUrl(phoneNumber: string): string {
 export function getWhatsAppUrl(phoneNumber: string, message: string): string {
   const clean = getCleanPhone(phoneNumber).replace('+', '');
   return `https://wa.me/${clean}?text=${encodeURIComponent(message)}`;
-}
-
-export interface SmsGatewayConfig {
-  provider: 'direct_cloud' | 'twilio' | 'google_voice_assisted';
-  googleVoiceNumber?: string;
-  twilioSid?: string;
-  twilioToken?: string;
-  twilioFromNumber?: string;
-  senderName?: string;
-  directAutoSendEnabled: boolean;
-}
-
-export const DEFAULT_SMS_GATEWAY_CONFIG: SmsGatewayConfig = {
-  provider: 'direct_cloud',
-  googleVoiceNumber: '',
-  senderName: 'Church Outreach Ministry',
-  directAutoSendEnabled: true,
-};
-
-export function getSmsGatewayConfig(): SmsGatewayConfig {
-  try {
-    const raw = localStorage.getItem('mp_sms_gateway_config');
-    return raw ? { ...DEFAULT_SMS_GATEWAY_CONFIG, ...JSON.parse(raw) } : DEFAULT_SMS_GATEWAY_CONFIG;
-  } catch {
-    return DEFAULT_SMS_GATEWAY_CONFIG;
-  }
 }
 
 export function saveSmsGatewayConfig(cfg: SmsGatewayConfig): void {
@@ -216,4 +242,82 @@ export function clearOutreachLogs(): void {
   } catch (err) {
     console.error(err);
   }
+}
+
+// ----------------- TESTERS MANAGEMENT -----------------
+const TESTERS_STORAGE_KEY = 'ministry_pulse_testers_v1';
+
+export function getTesterContacts(): TesterContact[] {
+  try {
+    const raw = localStorage.getItem(TESTERS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveTesterContact(tester: Omit<TesterContact, 'id' | 'addedAt'>): TesterContact {
+  const testers = getTesterContacts();
+  const clean = getCleanPhone(tester.phoneNumber);
+  
+  // Update if phone already exists
+  const existingIdx = testers.findIndex(t => t.cleanPhone === clean);
+  const newTester: TesterContact = {
+    ...tester,
+    id: existingIdx >= 0 ? testers[existingIdx].id : `tester-${Date.now()}`,
+    cleanPhone: clean,
+    addedAt: existingIdx >= 0 ? testers[existingIdx].addedAt : new Date().toISOString(),
+  };
+
+  if (existingIdx >= 0) {
+    testers[existingIdx] = newTester;
+  } else {
+    testers.push(newTester);
+  }
+
+  try {
+    localStorage.setItem(TESTERS_STORAGE_KEY, JSON.stringify(testers));
+  } catch (err) {
+    console.error('Failed to save tester:', err);
+  }
+  return newTester;
+}
+
+export function deleteTesterContact(id: string): void {
+  const testers = getTesterContacts().filter(t => t.id !== id);
+  try {
+    localStorage.setItem(TESTERS_STORAGE_KEY, JSON.stringify(testers));
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+// ----------------- SUNDAY CHECK-INS / ATTENDANCE -----------------
+const CHECKINS_STORAGE_KEY = 'ministry_pulse_checkins_v1';
+
+export function getCheckInRecords(): CheckInRecord[] {
+  try {
+    const raw = localStorage.getItem(CHECKINS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveCheckInRecord(record: Omit<CheckInRecord, 'id' | 'timestamp' | 'date'>): CheckInRecord {
+  const all = getCheckInRecords();
+  const today = new Date().toISOString().split('T')[0];
+  const newCheckIn: CheckInRecord = {
+    ...record,
+    id: `chk-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    timestamp: new Date().toISOString(),
+    date: today,
+  };
+  all.unshift(newCheckIn);
+  try {
+    localStorage.setItem(CHECKINS_STORAGE_KEY, JSON.stringify(all));
+  } catch (err) {
+    console.error('Failed to save check-in record:', err);
+  }
+  return newCheckIn;
 }

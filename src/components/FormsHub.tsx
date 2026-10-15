@@ -18,6 +18,9 @@ import {
   AlertCircle,
   HelpCircle,
   Share2,
+  Code,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 interface FormsHubProps {
@@ -32,6 +35,7 @@ interface FormsHubProps {
   onOpenDispatcherForResponse: (response: GoogleFormResponse) => void;
   churchName: string;
   hasGoogleAuth: boolean;
+  onNavigateToCheckIn?: () => void;
 }
 
 export const FormsHub: React.FC<FormsHubProps> = ({
@@ -46,8 +50,11 @@ export const FormsHub: React.FC<FormsHubProps> = ({
   onOpenDispatcherForResponse,
   churchName,
   hasGoogleAuth,
+  onNavigateToCheckIn,
 }) => {
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedScript, setCopiedScript] = useState(false);
+  const [showScriptDetails, setShowScriptDetails] = useState(false);
   const [autoWelcomeOnImport, setAutoWelcomeOnImport] = useState(true);
   const [showQrModal, setShowQrModal] = useState(false);
 
@@ -113,6 +120,88 @@ export const FormsHub: React.FC<FormsHubProps> = ({
         </div>
       </div>
 
+      {/* Answer to User Query: Live Phone Lookup vs Google Forms */}
+      <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-indigo-950 text-white rounded-2xl p-5 border border-emerald-500/30 shadow-md space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold border border-emerald-500/40">
+              <Sparkles className="w-3.5 h-3.5" />
+              Live Database Check-In Feature
+            </div>
+            <h3 className="text-base font-bold text-white">
+              Want Attendees to Scan a QR Code, Type Phone, and Get "Welcome Back" or Register?
+            </h3>
+            <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+              Standard Google Forms <strong>cannot run live database lookups</strong> while an attendee types their phone number due to Google's platform limitations.
+              However, our built-in <strong>Sunday Smart QR Check-In Portal</strong> performs this exact workflow live with instant recognition, sign-in streak, and first-time registration!
+            </p>
+          </div>
+
+          {onNavigateToCheckIn && (
+            <button
+              onClick={onNavigateToCheckIn}
+              className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg transition flex items-center gap-1.5 flex-shrink-0 self-start sm:self-center"
+            >
+              <QrCode className="w-4 h-4" />
+              <span>Open Smart QR Check-In</span>
+            </button>
+          )}
+        </div>
+
+        {/* Collapsible Google Apps Script Guide for advanced users */}
+        <div className="pt-2 border-t border-slate-800">
+          <button
+            type="button"
+            onClick={() => setShowScriptDetails(!showScriptDetails)}
+            className="text-xs text-slate-400 hover:text-emerald-300 flex items-center gap-1.5 font-medium transition"
+          >
+            <Code className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Still want to automate your Google Form with Google Apps Script? (Click for code)</span>
+            {showScriptDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+
+          {showScriptDetails && (
+            <div className="mt-3 p-4 bg-slate-950 rounded-xl border border-slate-800 text-xs space-y-2 text-slate-300 font-mono">
+              <div className="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-800">
+                <span className="font-sans font-bold text-emerald-400">Google Apps Script onFormSubmit Trigger</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const scriptCode = `// In Google Sheets: Extensions -> Apps Script
+function onFormSubmit(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var responses = e.values; // Form submission values
+  var phone = responses[2]; // Column with phone number
+  
+  // Search existing records in sheet
+  var data = sheet.getDataRange().getValues();
+  var isReturning = false;
+  for (var i = 1; i < data.length - 1; i++) {
+    if (data[i][1] == phone) { // Compare phone
+      isReturning = true;
+      break;
+    }
+  }
+  // Log check-in status
+  Logger.log(isReturning ? "Returning Member Checked In" : "New First-Time Visitor");
+}`;
+                    navigator.clipboard.writeText(scriptCode);
+                    setCopiedScript(true);
+                    setTimeout(() => setCopiedScript(false), 2000);
+                  }}
+                  className="font-sans text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-bold"
+                >
+                  {copiedScript ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedScript ? 'Copied Script!' : 'Copy Script'}</span>
+                </button>
+              </div>
+              <p className="font-sans text-[11px] text-slate-400">
+                While Google Forms cannot display "Welcome back" to the user on their screen in real time, you can attach an <code>onFormSubmit</code> Apps Script trigger in your Google Sheet to automatically flag returning members after they hit Submit.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
       {/* Form Status Card & Live Sharing Link */}
       {currentForm ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">

@@ -126,7 +126,7 @@ export const BatchBroadcastRunnerModal: React.FC<BatchBroadcastRunnerModalProps>
   });
 
   const gatewayConfig = getSmsGatewayConfig();
-  const gVoiceUrl = currentMember ? getGoogleVoiceMessageUrl(currentMember.phoneNumber) : '';
+  const gVoiceUrl = currentMember ? getGoogleVoiceMessageUrl(currentMember.phoneNumber, gatewayConfig) : '';
   const nativeSmsUrl = currentMember ? getNativeSmsUrl(currentMember.phoneNumber, currentMsg) : '';
 
   // Copy message helper
@@ -401,6 +401,22 @@ export const BatchBroadcastRunnerModal: React.FC<BatchBroadcastRunnerModalProps>
                         📞 OPEN GOOGLE VOICE FOR {currentMember.fullName.toUpperCase()} &amp; COPY
                       </span>
                     </button>
+
+                    {/* Account Indicator */}
+                    <div className="flex items-center justify-between px-1 text-[11px] text-slate-500">
+                      <span className="flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Google Voice Account:</span>
+                        <strong className="font-mono text-indigo-700 font-semibold">
+                          {gatewayConfig.googleVoiceEmail ? gatewayConfig.googleVoiceEmail : `Account Slot /u/${gatewayConfig.googleVoiceSlot || 0}`}
+                        </strong>
+                      </span>
+                      {gatewayConfig.googleVoiceEmail && (
+                        <span className="text-[10px] text-emerald-700 font-medium bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          Direct authuser Active
+                        </span>
+                      )}
+                    </div>
 
                     <div className="grid grid-cols-2 gap-2">
                       <button

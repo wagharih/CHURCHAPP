@@ -34,10 +34,14 @@ export const GoogleVoiceSetupModal: React.FC<GoogleVoiceSetupModalProps> = ({
   churchName,
 }) => {
   const [phoneNumber, setPhoneNumber] = useState(gatewayConfig.googleVoiceNumber || '');
+  const [churchEmail, setChurchEmail] = useState(gatewayConfig.googleVoiceEmail || '');
+  const [slotIndex, setSlotIndex] = useState<number>(gatewayConfig.googleVoiceSlot ?? 0);
+  const [routingMode, setRoutingMode] = useState<'email' | 'slot'>(gatewayConfig.googleVoiceRoutingMode || 'email');
   const [senderName, setSenderName] = useState(gatewayConfig.senderName || `${churchName} Ministry Team`);
   const [hasSaved, setHasSaved] = useState(false);
   const [testSent, setTestSent] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   if (!isOpen) return null;
 
@@ -46,6 +50,9 @@ export const GoogleVoiceSetupModal: React.FC<GoogleVoiceSetupModalProps> = ({
     const updated: SmsGatewayConfig = {
       ...gatewayConfig,
       googleVoiceNumber: phoneNumber.trim(),
+      googleVoiceEmail: churchEmail.trim(),
+      googleVoiceSlot: Number(slotIndex) || 0,
+      googleVoiceRoutingMode: routingMode,
       senderName: senderName.trim(),
     };
     onSaveConfig(updated);
@@ -63,6 +70,14 @@ export const GoogleVoiceSetupModal: React.FC<GoogleVoiceSetupModalProps> = ({
       setTestSent(true);
       setTimeout(() => setTestSent(false), 3000);
     }, 600);
+  };
+
+  const testRoutingUrl = churchEmail.trim() && routingMode === 'email'
+    ? `https://voice.google.com/u/${slotIndex}/messages?authuser=${encodeURIComponent(churchEmail.trim())}`
+    : `https://voice.google.com/u/${slotIndex}/messages`;
+
+  const handleVerifyVoiceLink = () => {
+    window.open(testRoutingUrl, '_blank', 'noopener,noreferrer');
   };
 
   const formattedDisplay = phoneNumber ? formatDisplayPhone(phoneNumber) : 'No number added yet';
@@ -150,11 +165,12 @@ export const GoogleVoiceSetupModal: React.FC<GoogleVoiceSetupModalProps> = ({
 
           {/* Form */}
           <form onSubmit={handleSave} className="space-y-4 pt-1">
+            {/* Step 1: Church Google Voice Phone Number */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[11px] font-bold">2</span>
-                  Type or Paste Your Google Voice Number:
+                  <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[11px] font-bold">1</span>
+                  Church Google Voice Phone Number:
                 </label>
                 {!phoneNumber && (
                   <button
@@ -178,14 +194,69 @@ export const GoogleVoiceSetupModal: React.FC<GoogleVoiceSetupModalProps> = ({
                 />
               </div>
               <p className="text-[11px] text-slate-500 mt-1">
-                Format: Any US or international phone number (e.g. 555-234-5678 or +1 555 234 5678).
+                This is your caller ID and reply-to phone number that members see in messages.
               </p>
             </div>
 
+            {/* Step 2: Church Google Account & Email Routing (The Confirmed Decision!) */}
+            <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[11px] font-bold">2</span>
+                  Church Google Voice Account Email:
+                </label>
+                <span className="text-[10px] font-semibold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full border border-indigo-200">
+                  Direct Email Routing
+                </span>
+              </div>
+
+              <div className="relative">
+                <input
+                  type="email"
+                  value={churchEmail}
+                  onChange={e => setChurchEmail(e.target.value)}
+                  placeholder="e.g. harvestchurch@gmail.com or ministry@church.org"
+                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-indigo-200 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 transition"
+                />
+              </div>
+
+              <p className="text-[11px] text-indigo-900 leading-relaxed">
+                When you or your staff click <strong>"Send via Google Voice"</strong>, the browser automatically opens Google Voice using <code className="font-mono bg-white px-1 py-0.5 rounded text-indigo-800 font-bold">&amp;authuser={churchEmail || 'church@gmail.com'}</code>. You do <strong>not</strong> have to sign out of your personal Google account!
+              </p>
+
+              {/* Slot Index and Routing Mode Option */}
+              <div className="pt-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-indigo-100/80">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-indigo-800 font-medium">Account Slot (Fallback):</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={9}
+                    value={slotIndex}
+                    onChange={e => setSlotIndex(parseInt(e.target.value, 10) || 0)}
+                    className="w-14 px-2 py-1 text-xs bg-white border border-indigo-200 rounded-lg text-center font-mono font-bold"
+                  />
+                  <span className="text-[10px] text-indigo-600">(/u/{slotIndex})</span>
+                </div>
+
+                {/* Live Test / Verify Button */}
+                <button
+                  type="button"
+                  onClick={handleVerifyVoiceLink}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg shadow-sm transition"
+                  title="Opens Google Voice in a test tab with the exact authuser email parameter"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Verify Church Google Voice Tab</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Step 3: Ministry Display Name */}
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                Ministry / Sender Display Name
+                <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[11px] font-bold">3</span>
+                Ministry / Sender Display Name:
               </label>
               <input
                 type="text"
@@ -196,10 +267,10 @@ export const GoogleVoiceSetupModal: React.FC<GoogleVoiceSetupModalProps> = ({
               />
             </div>
 
-            {/* Live Message Preview showing the Google Voice Number */}
+            {/* Live Message Preview showing the Google Voice Number & Active Routing */}
             <div className="bg-slate-900 rounded-xl p-3.5 text-white space-y-2 border border-slate-800">
               <div className="flex items-center justify-between text-[11px] text-slate-400">
-                <span>Member Preview (Showing your Church Google Voice Line):</span>
+                <span>Outreach Preview (Church Google Voice Line):</span>
                 <span className="text-emerald-400 font-mono font-bold">
                   {phoneNumber ? formatDisplayPhone(phoneNumber) : 'No Number Added'}
                 </span>
@@ -212,6 +283,12 @@ export const GoogleVoiceSetupModal: React.FC<GoogleVoiceSetupModalProps> = ({
                 </strong>
                 ! - {senderName}"
               </div>
+              {churchEmail && (
+                <div className="text-[10px] text-indigo-300 flex items-center gap-1 pt-1 border-t border-slate-800">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                  <span>Direct Routing Active: Opening Google Voice under <strong>{churchEmail}</strong></span>
+                </div>
+              )}
             </div>
 
             {/* Test Simulation Button */}

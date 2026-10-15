@@ -50,10 +50,30 @@ export const initAuth = (
   });
 };
 
-export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
+export const googleSignIn = async (options?: {
+  selectAccount?: boolean;
+  loginHint?: string;
+}): Promise<{ user: User; accessToken: string } | null> => {
   try {
     isSigningIn = true;
-    const result = await signInWithPopup(auth, googleProvider);
+    const provider = new GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+    provider.addScope('https://www.googleapis.com/auth/drive');
+    provider.addScope('https://www.googleapis.com/auth/drive.file');
+    provider.addScope('https://www.googleapis.com/auth/drive.readonly');
+    provider.addScope('https://www.googleapis.com/auth/forms.body');
+    provider.addScope('https://www.googleapis.com/auth/forms.body.readonly');
+    provider.addScope('https://www.googleapis.com/auth/forms.responses.readonly');
+
+    const params: Record<string, string> = {
+      prompt: options?.selectAccount !== false ? 'select_account' : 'consent',
+    };
+    if (options?.loginHint) {
+      params.login_hint = options.loginHint;
+    }
+    provider.setCustomParameters(params);
+
+    const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (!credential?.accessToken) {
       throw new Error('Failed to obtain Google access token from sign-in.');
@@ -66,6 +86,10 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
   } finally {
     isSigningIn = false;
   }
+};
+
+export const switchGoogleAccount = async (targetEmail?: string) => {
+  return googleSignIn({ selectAccount: true, loginHint: targetEmail });
 };
 
 export const getAccessToken = (): string | null => {

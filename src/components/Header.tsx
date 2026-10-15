@@ -15,6 +15,10 @@ import {
   AlertCircle,
   HelpCircle,
   Phone,
+  QrCode,
+  ShieldCheck,
+  Key,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { formatDisplayPhone } from '../services/communications';
 
@@ -33,12 +37,17 @@ interface HeaderProps {
   onOpenGoogleVoiceSetup: () => void;
   onSync: () => void;
   isSyncing: boolean;
-  activeTab: 'members' | 'forms' | 'welcome' | 'broadcast' | 'logs' | 'sheet';
-  setActiveTab: (tab: 'members' | 'forms' | 'welcome' | 'broadcast' | 'logs' | 'sheet') => void;
+  activeTab: 'members' | 'forms' | 'welcome' | 'broadcast' | 'checkin' | 'logs' | 'sheet';
+  setActiveTab: (tab: 'members' | 'forms' | 'welcome' | 'broadcast' | 'checkin' | 'logs' | 'sheet') => void;
   pendingWelcomesCount: number;
   membersCount: number;
   formResponsesCount: number;
   churchName: string;
+  testersCount?: number;
+  onOpenTesterManager?: () => void;
+  churchVoiceEmail?: string;
+  onSwitchAccount?: () => void;
+  onOpenOAuthGuide?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -62,6 +71,11 @@ export const Header: React.FC<HeaderProps> = ({
   membersCount,
   formResponsesCount,
   churchName,
+  testersCount = 0,
+  onOpenTesterManager,
+  churchVoiceEmail,
+  onSwitchAccount,
+  onOpenOAuthGuide,
 }) => {
   return (
     <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md">
@@ -88,29 +102,44 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Right Side: Google Voice, Form & Sheet Status & Google Sign In Button */}
+          {/* Right Side: Google Voice, Testers, Form & Sheet Status & Google Sign In Button */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Verified Testers Button */}
+            {onOpenTesterManager && (
+              <button
+                onClick={onOpenTesterManager}
+                className="flex items-center gap-1.5 text-xs py-1.5 px-2.5 rounded-lg bg-indigo-950/60 hover:bg-indigo-900 text-indigo-300 border border-indigo-700/60 transition cursor-pointer"
+                title="Manage verified tester phone numbers to receive test broadcasts on your real device"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="hidden sm:inline font-semibold">Testers</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-500/30 text-indigo-200 font-mono font-bold">
+                  {testersCount}
+                </span>
+              </button>
+            )}
+
             {/* Google Voice Line Badge */}
             <button
               onClick={onOpenGoogleVoiceSetup}
               className={`flex items-center gap-1.5 text-xs py-1.5 px-2.5 rounded-lg border transition cursor-pointer ${
-                googleVoiceNumber
+                googleVoiceNumber || churchVoiceEmail
                   ? 'bg-slate-800/80 hover:bg-slate-800 text-slate-200 border-slate-700'
                   : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30 font-semibold'
               }`}
-              title="Add or configure church Google Voice number for Caller ID & replies"
+              title="Add or configure church Google Voice line and email routing"
             >
               <Phone className="w-3.5 h-3.5 text-emerald-400" />
               <div className="text-left hidden lg:block">
                 <div className="text-[10px] uppercase font-semibold text-slate-400 leading-none">
-                  Google Voice Line
+                  Church Voice {churchVoiceEmail ? '• Email Linked' : ''}
                 </div>
                 <div className="font-medium text-emerald-300 font-mono truncate max-w-[140px]">
-                  {googleVoiceNumber ? formatDisplayPhone(googleVoiceNumber) : '+ Add Google Voice'}
+                  {googleVoiceNumber ? formatDisplayPhone(googleVoiceNumber) : churchVoiceEmail ? churchVoiceEmail.split('@')[0] : '+ Add Google Voice'}
                 </div>
               </div>
               <span className="lg:hidden text-xs font-semibold text-emerald-300">
-                {googleVoiceNumber ? 'GV Line' : '+ Add Voice'}
+                {googleVoiceNumber ? 'GV Line' : churchVoiceEmail ? 'GV Email' : '+ Add Voice'}
               </span>
             </button>
 
@@ -171,9 +200,21 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
+            {/* Google Cloud Test Users & Access Setup Guide Button */}
+            {onOpenOAuthGuide && (
+              <button
+                onClick={onOpenOAuthGuide}
+                className="flex items-center gap-1.5 text-xs py-1.5 px-2.5 rounded-lg bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 border border-amber-700/60 transition cursor-pointer"
+                title="Open Google Cloud Test Users setup guide to add church email & remove 403 errors"
+              >
+                <Key className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden xl:inline font-semibold">Test Users</span>
+              </button>
+            )}
+
             {/* Google Account Profile or Sign In Button */}
             {user && hasToken ? (
-              <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
+              <div className="flex items-center gap-1.5 sm:gap-2 pl-2 border-l border-slate-800">
                 {user.photoURL ? (
                   <img
                     src={user.photoURL}
@@ -189,10 +230,22 @@ export const Header: React.FC<HeaderProps> = ({
                   <div className="text-xs font-semibold text-slate-200 truncate max-w-[110px]">
                     {user.displayName || 'Church Staff'}
                   </div>
-                  <div className="text-[10px] text-slate-400 truncate max-w-[110px]">
+                  <div className="text-[10px] text-slate-400 truncate max-w-[110px]" title={user.email || ''}>
                     {user.email}
                   </div>
                 </div>
+
+                {/* Switch Account Button */}
+                {onSwitchAccount && (
+                  <button
+                    onClick={onSwitchAccount}
+                    className="p-1.5 text-indigo-300 hover:text-white hover:bg-indigo-900/60 rounded-lg transition"
+                    title="Switch Google Account (Builder or Church Account)"
+                  >
+                    <ArrowLeftRight className="w-4 h-4" />
+                  </button>
+                )}
+
                 <button
                   onClick={onLogout}
                   className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition"
@@ -203,38 +256,40 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             ) : (
               /* Official Google Sign-in Styled Button */
-              <button
-                onClick={onLogin}
-                disabled={isLoggingIn}
-                className="gsi-material-button relative inline-flex items-center justify-center px-3 py-1.5 border border-slate-600 rounded-lg bg-white hover:bg-slate-100 text-slate-800 text-xs font-semibold shadow-sm transition disabled:opacity-50"
-              >
-                <div className="flex items-center gap-2">
-                  <svg
-                    version="1.1"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 48 48"
-                    className="w-4 h-4"
-                  >
-                    <path
-                      fill="#EA4335"
-                      d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
-                    />
-                    <path
-                      fill="#4285F4"
-                      d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
-                    />
-                  </svg>
-                  <span>{isLoggingIn ? 'Connecting...' : 'Sign in with Google'}</span>
-                </div>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onLogin}
+                  disabled={isLoggingIn}
+                  className="gsi-material-button relative inline-flex items-center justify-center px-3 py-1.5 border border-slate-600 rounded-lg bg-white hover:bg-slate-100 text-slate-800 text-xs font-semibold shadow-sm transition disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-2">
+                    <svg
+                      version="1.1"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 48 48"
+                      className="w-4 h-4"
+                    >
+                      <path
+                        fill="#EA4335"
+                        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+                      />
+                      <path
+                        fill="#4285F4"
+                        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+                      />
+                    </svg>
+                    <span>{isLoggingIn ? 'Connecting...' : 'Sign in with Google'}</span>
+                  </div>
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -275,6 +330,22 @@ export const Header: React.FC<HeaderProps> = ({
                 {formResponsesCount}
               </span>
             )}
+          </button>
+
+          {/* Sunday QR Check-In */}
+          <button
+            onClick={() => setActiveTab('checkin')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${
+              activeTab === 'checkin'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <QrCode className="w-4 h-4 text-emerald-300" />
+            <span>Sunday QR Check-In</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+              Live Lookup
+            </span>
           </button>
 
           {/* Automated Welcome */}

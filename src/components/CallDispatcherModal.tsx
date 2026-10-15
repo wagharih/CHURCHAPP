@@ -54,11 +54,11 @@ export const CallDispatcherModal: React.FC<CallDispatcherModalProps> = ({
 
   if (!isOpen || !member) return null;
 
-  const cleanPhone = getCleanPhone(member.phoneNumber);
-  const googleVoiceMsgUrl = getGoogleVoiceMessageUrl(member.phoneNumber);
-  const googleVoiceCallUrl = getGoogleVoiceCallUrl(member.phoneNumber);
-  const nativeSmsUrl = getNativeSmsUrl(member.phoneNumber, messageText);
   const gatewayConfig = getSmsGatewayConfig();
+  const cleanPhone = getCleanPhone(member.phoneNumber);
+  const googleVoiceMsgUrl = getGoogleVoiceMessageUrl(member.phoneNumber, gatewayConfig);
+  const googleVoiceCallUrl = getGoogleVoiceCallUrl(member.phoneNumber, gatewayConfig);
+  const nativeSmsUrl = getNativeSmsUrl(member.phoneNumber, messageText);
 
   const handleCopyMessage = () => {
     navigator.clipboard.writeText(messageText);
@@ -238,6 +238,22 @@ export const CallDispatcherModal: React.FC<CallDispatcherModalProps> = ({
             <p className="text-[11px] text-slate-600 leading-relaxed">
               Clicking below copies this message to your clipboard, opens Google Voice directly to {member.fullName}'s number, and marks their status in your Google Sheet!
             </p>
+
+            {/* Account Indicator */}
+            <div className="flex items-center justify-between px-1 text-[11px] text-slate-600 bg-white/70 p-2 rounded-lg border border-emerald-100">
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Opening with Voice Account:</span>
+                <strong className="font-mono text-indigo-700 font-bold">
+                  {gatewayConfig.googleVoiceEmail ? gatewayConfig.googleVoiceEmail : `Account Slot /u/${gatewayConfig.googleVoiceSlot || 0}`}
+                </strong>
+              </span>
+              {gatewayConfig.googleVoiceEmail && (
+                <span className="text-[10px] text-emerald-700 font-medium bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                  authuser Active
+                </span>
+              )}
+            </div>
 
             <button
               onClick={handleDispatchGoogleVoice}

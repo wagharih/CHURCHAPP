@@ -8,6 +8,7 @@ import { User } from 'firebase/auth';
 import {
   initAuth,
   googleSignIn,
+  switchGoogleAccount,
   logout as authLogout,
   getAccessToken,
   setAccessTokenInMemory,
@@ -25,6 +26,8 @@ import {
   SmsGatewayConfig,
   getSmsGatewayConfig,
   saveSmsGatewayConfig,
+  getCleanPhone,
+  getTesterContacts,
 } from './services/communications';
 import { getFormResponses, createMinistryGoogleForm } from './services/forms';
 import { MemberRecord, ChurchEvent, OutreachLog, GoogleFormInfo, GoogleFormResponse } from './types';
@@ -49,6 +52,9 @@ import { ConfirmationModal } from './components/ConfirmationModal';
 import { FormsHub } from './components/FormsHub';
 import { FormSelectorModal } from './components/FormSelectorModal';
 import { GoogleVoiceSetupModal } from './components/GoogleVoiceSetupModal';
+import { SmartCheckInKiosk } from './components/SmartCheckInKiosk';
+import { TesterManagerModal } from './components/TesterManagerModal';
+import { OAuthTestUsersModal } from './components/OAuthTestUsersModal';
 
 export default function App() {
   // Auth state
@@ -57,9 +63,13 @@ export default function App() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // App Navigation
-  const [activeTab, setActiveTab] = useState<'members' | 'forms' | 'welcome' | 'broadcast' | 'logs' | 'sheet'>(
-    'members'
-  );
+  const [activeTab, setActiveTab] = useState<
+    'members' | 'forms' | 'welcome' | 'broadcast' | 'checkin' | 'logs' | 'sheet'
+  >('members');
+
+  // Testers state
+  const [isTesterModalOpen, setIsTesterModalOpen] = useState(false);
+  const [testersCount, setTestersCount] = useState<number>(() => getTesterContacts().length);
 
   // Church Info & Configuration
   const [churchName, setChurchName] = useState<string>(() => {
@@ -110,6 +120,7 @@ export default function App() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isSheetModalOpen, setIsSheetModalOpen] = useState(false);
   const [isGoogleVoiceModalOpen, setIsGoogleVoiceModalOpen] = useState(false);
+  const [isOAuthGuideOpen, setIsOAuthGuideOpen] = useState(false);
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [memberToEdit, setMemberToEdit] = useState<MemberRecord | null>(null);
   const [isSavingMember, setIsSavingMember] = useState(false);
@@ -312,14 +323,51 @@ export default function App() {
       if (res) {
         setUser(res.user);
         setAccessToken(res.accessToken);
-        // If no sheet is connected yet, open sheet selector
         if (!currentSheetId) {
           setIsSheetModalOpen(true);
         }
       }
     } catch (err: any) {
       console.error('Sign in failed:', err);
-      alert('Sign-in failed. Please ensure third-party popups are enabled and try again.');
+      const msg = String(err?.message || err?.code || '');
+      if (
+        msg.includes('403') ||
+        msg.includes('access_denied') ||
+        msg.includes('developer') ||
+        msg.includes('blocked') ||
+        msg.includes('test')
+      ) {
+        setIsOAuthGuideOpen(true);
+      }
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  // Switch Google Account Handler (Between Builder and Church Accounts)
+  const handleSwitchAccount = async (targetEmail?: string) => {
+    setIsLoggingIn(true);
+    try {
+      const res = await switchGoogleAccount(targetEmail);
+      if (res) {
+        setUser(res.user);
+        setAccessToken(res.accessToken);
+        if (!currentSheetId) {
+          setIsSheetModalOpen(true);
+        }
+      }
+    } catch (err: any) {
+      console.error('Account switch failed:', err);
+      const msg = String(err?.message || err?.code || '');
+      if (
+        msg.includes('403') ||
+        msg.includes('access_denied') ||
+        msg.includes('developer') ||
+        msg.includes('blocked') ||
+        msg.includes('test')
+      ) {
+        setIsOAuthGuideOpen(true);
+      }
     } finally {
       setIsLoggingIn(false);
     }
@@ -569,6 +617,65 @@ export default function App() {
     setEvents(prev => [newEvent, ...prev]);
   };
 
+  // Handle Kiosk Registration for New Visitors
+  const handleKioskRegisterMember = async (data: {
+    fullName: string;
+    phoneNumber: string;
+    ministry: string;
+    notes?: string;
+  }): Promise<MemberRecord> => {
+    const token = accessToken || getAccessToken();
+    const today = new Date().toISOString().split('T')[0];
+    let assignedRowNumber = members.length + 2;
+
+    if (token && currentSheetId && currentTabName) {
+      try {
+        const res = await appendMemberToSheet(token, currentSheetId, currentTabName, {
+          fullName: data.fullName,
+          phoneNumber: data.phoneNumber,
+          ministry: data.ministry,
+          registeredAt: today,
+          welcomeStatus: 'Pending',
+          notes: data.notes || 'Registered via Sunday QR Kiosk',
+        });
+        assignedRowNumber = res.rowNumber;
+      } catch (err) {
+        console.error('Failed to append kiosk member to sheet:', err);
+      }
+    }
+
+    const newRecord: MemberRecord = {
+      id: `kiosk-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      rowNumber: assignedRowNumber,
+      fullName: data.fullName,
+      phoneNumber: data.phoneNumber,
+      cleanPhone: getCleanPhone(data.phoneNumber),
+      ministry: data.ministry,
+      registeredAt: today,
+      welcomeStatus: 'Pending',
+      notes: data.notes || 'Registered via Sunday QR Kiosk',
+    };
+
+    setMembers(prev => [newRecord, ...prev]);
+    return newRecord;
+  };
+
+  // Launch broadcast strictly to verified testers
+  const handleLaunchTesterBroadcast = (testerMembers: MemberRecord[]) => {
+    if (events.length > 0) {
+      handleRunBroadcast(
+        events[0],
+        testerMembers,
+        `Hi {First_Name}! 🕊️ [TEST BROADCAST] This is a verification test for "${events[0].title}" on ${events[0].date}. - ${churchName}`
+      );
+    }
+  };
+
+  const handleOpenTesterModal = () => {
+    setTestersCount(getTesterContacts().length);
+    setIsTesterModalOpen(true);
+  };
+
   const pendingWelcomesCount = members.filter(
     m => m.welcomeStatus.toLowerCase() !== 'welcomed'
   ).length;
@@ -597,6 +704,11 @@ export default function App() {
         membersCount={members.length}
         formResponsesCount={formResponses.length}
         churchName={churchName}
+        testersCount={testersCount}
+        onOpenTesterManager={handleOpenTesterModal}
+        churchVoiceEmail={gatewayConfig.googleVoiceEmail}
+        onSwitchAccount={() => handleSwitchAccount(gatewayConfig.googleVoiceEmail)}
+        onOpenOAuthGuide={() => setIsOAuthGuideOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -641,6 +753,7 @@ export default function App() {
             isSyncing={isSyncing}
             hasGoogleSheet={!!currentSheetId && !!accessToken}
             currentSheetName={currentSheetTitle}
+            onOpenTesterManager={handleOpenTesterModal}
           />
         )}
 
@@ -658,6 +771,18 @@ export default function App() {
             onOpenDispatcherForResponse={handleOpenDispatcherForResponse}
             churchName={churchName}
             hasGoogleAuth={!!accessToken}
+            onNavigateToCheckIn={() => setActiveTab('checkin')}
+          />
+        )}
+
+        {/* Tab: Sunday Smart QR Check-In & Kiosk */}
+        {activeTab === 'checkin' && (
+          <SmartCheckInKiosk
+            members={members}
+            churchName={churchName}
+            events={events}
+            onRegisterNewMember={handleKioskRegisterMember}
+            onSendDirectWelcome={member => handleOpenDispatcher(member, 'welcome')}
           />
         )}
 
@@ -685,6 +810,7 @@ export default function App() {
             onAddEvent={() => setIsAddEventOpen(true)}
             onRunBroadcast={handleRunBroadcast}
             churchName={churchName}
+            onOpenTesterManager={handleOpenTesterModal}
           />
         )}
 
@@ -963,6 +1089,28 @@ export default function App() {
           saveSmsGatewayConfig(updated);
         }}
         churchName={churchName}
+      />
+
+      {/* 9. Tester & Real Test Numbers Manager Modal */}
+      <TesterManagerModal
+        isOpen={isTesterModalOpen}
+        onClose={() => {
+          setIsTesterModalOpen(false);
+          setTestersCount(getTesterContacts().length);
+        }}
+        churchName={churchName}
+        userEmail={user?.email || undefined}
+        userName={user?.displayName || undefined}
+        onSelectTestersForBroadcast={handleLaunchTesterBroadcast}
+      />
+
+      {/* 10. Google Cloud Test Users & Access Setup Guide Modal */}
+      <OAuthTestUsersModal
+        isOpen={isOAuthGuideOpen}
+        onClose={() => setIsOAuthGuideOpen(false)}
+        churchEmail={gatewayConfig.googleVoiceEmail}
+        currentEmail={user?.email || undefined}
+        onSwitchAccount={handleSwitchAccount}
       />
     </div>
   );
