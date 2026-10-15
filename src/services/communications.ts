@@ -145,6 +145,17 @@ export function getNativeSmsUrl(phoneNumber: string, message: string): string {
   return `sms:${clean}?body=${encodeURIComponent(message)}`;
 }
 
+/**
+ * Returns direct URL for Attendee Mobile Self-Service Check-In Kiosk
+ */
+export function getKioskUrl(): string {
+  if (typeof window === 'undefined') return '';
+  const origin = window.location.origin;
+  const pathname = window.location.pathname;
+  return `${origin}${pathname}?mode=kiosk`;
+}
+
+
 export function getGoogleMessagesWebUrl(phoneNumber: string): string {
   const clean = getCleanPhone(phoneNumber);
   return `https://messages.google.com/web/conversations/new?phone=${encodeURIComponent(clean)}`;

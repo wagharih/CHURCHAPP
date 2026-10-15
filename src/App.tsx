@@ -67,6 +67,55 @@ export default function App() {
     'members' | 'forms' | 'welcome' | 'broadcast' | 'checkin' | 'logs' | 'sheet'
   >('members');
 
+  // Attendee Kiosk Keypad Mode (active when opened via QR code or ?mode=kiosk)
+  const checkIsKioskFromUrl = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    const search = window.location.search || '';
+    const hash = window.location.hash || '';
+    const params = new URLSearchParams(search);
+    return (
+      params.get('mode') === 'kiosk' ||
+      params.get('view') === 'kiosk' ||
+      params.get('kiosk') === 'true' ||
+      params.get('kiosk') === '1' ||
+      params.get('tab') === 'checkin' ||
+      hash.toLowerCase().includes('kiosk') ||
+      hash.toLowerCase().includes('checkin')
+    );
+  };
+
+  const [isAttendeeKioskMode, setIsAttendeeKioskMode] = useState<boolean>(checkIsKioskFromUrl);
+
+  // Sync kiosk mode with URL history and popstate
+  useEffect(() => {
+    const handleUrlChange = () => {
+      setIsAttendeeKioskMode(checkIsKioskFromUrl());
+    };
+    window.addEventListener('popstate', handleUrlChange);
+    return () => window.removeEventListener('popstate', handleUrlChange);
+  }, []);
+
+  const handleExitKioskToAdmin = () => {
+    setIsAttendeeKioskMode(false);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('mode');
+      url.searchParams.delete('view');
+      url.searchParams.delete('kiosk');
+      url.searchParams.delete('tab');
+      window.history.pushState({}, '', url.pathname + (url.search ? url.search : ''));
+    }
+  };
+
+  const handleEnterKioskMode = () => {
+    setIsAttendeeKioskMode(true);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('mode', 'kiosk');
+      window.history.pushState({}, '', url.toString());
+    }
+  };
+
   // Testers state
   const [isTesterModalOpen, setIsTesterModalOpen] = useState(false);
   const [testersCount, setTestersCount] = useState<number>(() => getTesterContacts().length);
@@ -680,6 +729,68 @@ export default function App() {
     m => m.welcomeStatus.toLowerCase() !== 'welcomed'
   ).length;
 
+  // DEDICATED ATTENDEE KEYPAD KIOSK (Loaded directly when scanning QR code or visiting ?mode=kiosk)
+  if (isAttendeeKioskMode) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between font-sans">
+        {/* Attendee Kiosk Header */}
+        <header className="px-4 sm:px-8 py-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white flex items-center justify-center font-bold text-lg shadow-md border border-emerald-400/30">
+              ✝
+            </div>
+            <div>
+              <h1 className="text-base sm:text-lg font-extrabold text-white tracking-tight leading-tight">
+                {churchName}
+              </h1>
+              <p className="text-xs text-emerald-400 font-semibold flex items-center gap-1.5">
+                <span>Sunday Worship Check-In</span>
+                <span className="text-slate-600">•</span>
+                <span className="text-slate-400 font-normal">
+                  {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleExitKioskToAdmin}
+            className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 hover:bg-slate-800 transition flex items-center gap-1.5 cursor-pointer font-medium"
+            title="Switch to Staff Administration Dashboard"
+          >
+            <span>Staff Admin Portal</span>
+          </button>
+        </header>
+
+        {/* Dedicated Keypad Check-in Interface */}
+        <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 w-full max-w-xl mx-auto my-auto animate-fade-in">
+          <SmartCheckInKiosk
+            members={members}
+            churchName={churchName}
+            events={events}
+            onRegisterNewMember={handleKioskRegisterMember}
+            onSendDirectWelcome={member => handleOpenDispatcher(member, 'welcome')}
+            isAttendeeOnly={true}
+            onExitToAdmin={handleExitKioskToAdmin}
+          />
+        </main>
+
+        {/* Quiet Church Footer */}
+        <footer className="py-3 px-6 text-center text-xs text-slate-500 border-t border-slate-900 bg-slate-950/80 flex items-center justify-between">
+          <span>{churchName} • All are welcome in the House of the Lord</span>
+          <button
+            type="button"
+            onClick={handleExitKioskToAdmin}
+            className="text-slate-500 hover:text-slate-300 text-[11px] underline underline-offset-2 transition cursor-pointer"
+          >
+            Staff Dashboard →
+          </button>
+        </footer>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-100/90 text-slate-800 flex flex-col font-sans">
       {/* App Header */}
@@ -783,6 +894,8 @@ export default function App() {
             events={events}
             onRegisterNewMember={handleKioskRegisterMember}
             onSendDirectWelcome={member => handleOpenDispatcher(member, 'welcome')}
+            isAttendeeOnly={false}
+            onLaunchAttendeeKiosk={handleEnterKioskMode}
           />
         )}
 

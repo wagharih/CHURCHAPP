@@ -129,6 +129,24 @@ export const BatchBroadcastRunnerModal: React.FC<BatchBroadcastRunnerModalProps>
   const gVoiceUrl = currentMember ? getGoogleVoiceMessageUrl(currentMember.phoneNumber, gatewayConfig) : '';
   const nativeSmsUrl = currentMember ? getNativeSmsUrl(currentMember.phoneNumber, currentMsg) : '';
 
+  const [copiedPhone, setCopiedPhone] = useState(false);
+  const [gvStep, setGvStep] = useState<'idle' | 'phone_copied' | 'msg_copied'>('idle');
+
+  useEffect(() => {
+    setGvStep('idle');
+    setCopiedPhone(false);
+    setCopied(false);
+  }, [safeCurrentIndex]);
+
+  // Copy phone helper
+  const copyCurrentPhone = () => {
+    if (!currentMember) return;
+    const clean = getCleanPhone(currentMember.phoneNumber);
+    navigator.clipboard.writeText(clean);
+    setCopiedPhone(true);
+    setTimeout(() => setCopiedPhone(false), 2500);
+  };
+
   // Copy message helper
   const copyCurrentMessage = () => {
     navigator.clipboard.writeText(currentMsg);
@@ -136,12 +154,15 @@ export const BatchBroadcastRunnerModal: React.FC<BatchBroadcastRunnerModalProps>
     setTimeout(() => setCopied(false), 2500);
   };
 
-  // SEND CURRENT MEMBER VIA GOOGLE VOICE
+  // STEP 1: OPEN GOOGLE VOICE & COPY PHONE NUMBER
   const handleSendViaGoogleVoice = () => {
     if (!currentMember) return;
 
-    // 1. Copy message to clipboard automatically so user just pastes in Google Voice
-    copyCurrentMessage();
+    // 1. Copy phone number to clipboard so user can immediately paste it into 'To' in Google Voice
+    const clean = getCleanPhone(currentMember.phoneNumber);
+    navigator.clipboard.writeText(clean);
+    setCopiedPhone(true);
+    setGvStep('phone_copied');
 
     // 2. Open Google Voice in a new tab focused on this member's number
     window.open(gVoiceUrl, '_blank', 'noopener,noreferrer');
@@ -159,16 +180,23 @@ export const BatchBroadcastRunnerModal: React.FC<BatchBroadcastRunnerModalProps>
       status: 'opened',
       eventTitle: event?.title,
     });
+  };
 
-    // 5. Auto-advance to next member if enabled
+  // STEP 2: COPY MESSAGE TEXT FOR GOOGLE VOICE
+  const handleStep2CopyMessage = () => {
+    navigator.clipboard.writeText(currentMsg);
+    setCopied(true);
+    setGvStep('msg_copied');
+
+    // Auto-advance if enabled and user completed step 2
     if (autoAdvance) {
-      if (safeCurrentIndex + 1 < validRecipients.length) {
-        setTimeout(() => {
+      setTimeout(() => {
+        if (safeCurrentIndex + 1 < validRecipients.length) {
           setCurrentIndex(prev => prev + 1);
-        }, 500);
-      } else {
-        handleFinishBatch();
-      }
+        } else {
+          handleFinishBatch();
+        }
+      }, 1200);
     }
   };
 
@@ -366,67 +394,117 @@ export const BatchBroadcastRunnerModal: React.FC<BatchBroadcastRunnerModalProps>
                   <div className="bg-slate-900 rounded-xl p-3.5 text-white space-y-2 border border-slate-800">
                     <div className="flex items-center justify-between text-[11px] text-slate-400">
                       <span>Message for {currentMember.fullName}:</span>
-                      <button
-                        type="button"
-                        onClick={copyCurrentMessage}
-                        className="text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1"
-                      >
-                        {copied ? (
-                          <>
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Copied to Clipboard!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Copy Message</span>
-                          </>
-                        )}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={copyCurrentPhone}
+                          className="text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold flex items-center gap-1 transition"
+                        >
+                          {copiedPhone ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-400" />
+                              <span className="text-emerald-400">Phone Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3 text-slate-400" />
+                              <span>Copy Phone</span>
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={copyCurrentMessage}
+                          className="text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold flex items-center gap-1 transition"
+                        >
+                          {copied ? (
+                            <>
+                              <Check className="w-3 h-3" />
+                              <span>Text Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3" />
+                              <span>Copy Text</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <div className="bg-emerald-600 text-white p-3 rounded-xl rounded-tl-sm text-xs leading-relaxed font-sans shadow-sm">
                       {currentMsg}
                     </div>
                   </div>
 
-                  {/* PRIMARY ACTION BUTTONS */}
-                  <div className="space-y-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={handleSendViaGoogleVoice}
-                      className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl text-sm font-extrabold shadow-lg transition flex items-center justify-center gap-2 group cursor-pointer"
-                    >
-                      <Phone className="w-4 h-4 text-emerald-200 group-hover:scale-110 transition-transform" />
-                      <span>
-                        📞 OPEN GOOGLE VOICE FOR {currentMember.fullName.toUpperCase()} &amp; COPY
-                      </span>
-                    </button>
-
+                  {/* PRIMARY ACTION BUTTONS: GOOGLE VOICE 2-STEP ASSISTANT */}
+                  <div className="space-y-2.5 pt-1">
                     {/* Account Indicator */}
-                    <div className="flex items-center justify-between px-1 text-[11px] text-slate-500">
+                    <div className="flex items-center justify-between px-2 py-1 text-[11px] text-slate-600 bg-slate-100 rounded-lg">
                       <span className="flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Google Voice Account:</span>
+                        <span>Google Voice:</span>
                         <strong className="font-mono text-indigo-700 font-semibold">
-                          {gatewayConfig.googleVoiceEmail ? gatewayConfig.googleVoiceEmail : `Account Slot /u/${gatewayConfig.googleVoiceSlot || 0}`}
+                          {gatewayConfig.googleVoiceEmail ? gatewayConfig.googleVoiceEmail : `Slot /u/${gatewayConfig.googleVoiceSlot || 0}`}
                         </strong>
                       </span>
                       {gatewayConfig.googleVoiceEmail && (
-                        <span className="text-[10px] text-emerald-700 font-medium bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                          Direct authuser Active
+                        <span className="text-[10px] text-emerald-700 font-medium bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                          authuser Active
                         </span>
                       )}
                     </div>
+
+                    {/* Step 1 & Step 2 Buttons */}
+                    {gvStep === 'idle' ? (
+                      <button
+                        type="button"
+                        onClick={handleSendViaGoogleVoice}
+                        className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-xl text-sm font-extrabold shadow-lg transition flex items-center justify-center gap-2 group cursor-pointer"
+                      >
+                        <Phone className="w-4 h-4 text-emerald-200 group-hover:scale-110 transition-transform" />
+                        <span>
+                          1. COPY PHONE &amp; OPEN GOOGLE VOICE ({currentMember.fullName.toUpperCase()})
+                        </span>
+                      </button>
+                    ) : (
+                      <div className="space-y-2 bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
+                        <div className="flex items-center justify-between text-xs text-emerald-950">
+                          <span className="flex items-center gap-1 font-bold">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            <span>Step 1: Phone {getCleanPhone(currentMember.phoneNumber)} copied!</span>
+                          </span>
+                          <span className="text-[11px] text-emerald-800">Paste (Ctrl+V) in Google Voice 'To'</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleStep2CopyMessage}
+                          className={`w-full py-3 px-4 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-2 shadow-md ${
+                            gvStep === 'msg_copied'
+                              ? 'bg-teal-700 text-white'
+                              : 'bg-indigo-600 hover:bg-indigo-700 text-white animate-pulse'
+                          }`}
+                        >
+                          <Copy className="w-4 h-4" />
+                          <span>
+                            {gvStep === 'msg_copied'
+                              ? '✓ STEP 2: MESSAGE COPIED! (PASTE INTO MESSAGE BOX)'
+                              : '📋 STEP 2: CLICK TO COPY MESSAGE TEXT FOR GOOGLE VOICE'}
+                          </span>
+                        </button>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={handleSendViaPhoneSms}
-                        className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition"
-                        title="Pre-fills message into phone SMS app"
+                        className="py-2.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-950 border border-indigo-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                        title="Pre-fills both phone number and message into phone/desktop SMS app"
                       >
                         <Smartphone className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>Open in Phone SMS</span>
+                        <span>Open in Device SMS (Auto-Fills Both)</span>
                       </button>
 
                       <button
@@ -439,13 +517,18 @@ export const BatchBroadcastRunnerModal: React.FC<BatchBroadcastRunnerModalProps>
                             handleFinishBatch();
                           }
                         }}
-                        className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+                        className="py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition"
                       >
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Mark Sent &amp; Next</span>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Next Member →</span>
                       </button>
                     </div>
+
+                    <p className="text-[10px] text-slate-500 text-center leading-tight pt-0.5">
+                      💡 Google Voice does not allow external apps to auto-type text. Use Step 1 to paste phone, then Step 2 to paste message!
+                    </p>
                   </div>
+
 
                   {/* Navigation Footer */}
                   <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-500">
